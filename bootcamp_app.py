@@ -10,6 +10,7 @@ import base64
 import hmac
 import secrets
 import hashlib
+import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -65,7 +66,22 @@ if _is_vercel_runtime():
     try:
         from dako_bootcamp_init_db import init_db as _bootstrap_bootcamp_db
 
-        if not DB_PATH.exists() or DB_PATH.stat().st_size == 0:
+        def _has_bootcamp_schema(db_path: Path) -> bool:
+            if not db_path.exists() or db_path.stat().st_size == 0:
+                return False
+            try:
+                conn = sqlite3.connect(str(db_path), timeout=5)
+                try:
+                    row = conn.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='students'"
+                    ).fetchone()
+                    return row is not None
+                finally:
+                    conn.close()
+            except Exception:
+                return False
+
+        if not _has_bootcamp_schema(DB_PATH):
             _bootstrap_bootcamp_db()
     except Exception:
         # Keep startup resilient; first request may still initialize the DB path.
