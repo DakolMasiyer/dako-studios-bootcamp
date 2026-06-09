@@ -49,10 +49,14 @@ UPLOADS.mkdir(parents=True, exist_ok=True)
 FLW_SECRET  = os.getenv("FLUTTERWAVE_SECRET_KEY", "")
 FLW_PUBLIC  = os.getenv("FLUTTERWAVE_PUBLIC_KEY", "")
 FLW_WEBHOOK_SECRET = os.getenv("FLUTTERWAVE_WEBHOOK_SECRET", "")
+FLW_CLIENT_ID = os.getenv("FLW_CLIENT_ID") or FLW_PUBLIC
+FLW_CLIENT_SECRET = os.getenv("FLW_CLIENT_SECRET") or FLW_SECRET
 PRICE_USD   = float(os.getenv("BOOTCAMP_PRICE_USD", "49"))
 BASE_URL    = os.getenv("BASE_URL", "http://localhost:8000")
 FREE_DAYS   = 3   # Days 1–FREE_DAYS are always free
 ALLOW_PAYMENT_DEV_BYPASS = os.getenv("ALLOW_PAYMENT_DEV_BYPASS", "false").lower() in ("1", "true", "yes")
+
+_FLW_TOKEN_CACHE = {"access_token": "", "expires_at": 0.0}
 
 from payment_logger import log_payment_event
 
@@ -116,6 +120,39 @@ def _is_local_dev() -> bool:
 def _using_blob_storage() -> bool:
     return bool(os.getenv("BLOB_READ_WRITE_TOKEN")) and AsyncBlobClient is not None
 
+async def _get_flutterwave_access_token() -> str:
+    now = datetime.utcnow().timestamp()
+    if _FLW_TOKEN_CACHE["access_token"] and _FLW_TOKEN_CACHE["expires_at"] - now > 60:
+        return _FLW_TOKEN_CACHE["access_token"]
+
+    if not FLW_CLIENT_ID or not FLW_CLIENT_SECRET:
+        raise HTTPException(
+            500,
+            "Flutterwave client credentials are missing. Set FLW_CLIENT_ID and FLW_CLIENT_SECRET.",
+        )
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.post(
+            "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token",
+            data={
+                "client_id": FLW_CLIENT_ID,
+                "client_secret": FLW_CLIENT_SECRET,
+                "grant_type": "client_credentials",
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    access_token = data.get("access_token", "")
+    expires_in = int(data.get("expires_in") or 600)
+    if not access_token:
+        raise HTTPException(502, f"Flutterwave token request failed: {data}")
+
+    _FLW_TOKEN_CACHE["access_token"] = access_token
+    _FLW_TOKEN_CACHE["expires_at"] = now + expires_in
+    return access_token
+
 def _verify_flutterwave_webhook(raw_body: bytes, headers) -> bool:
     if not FLW_WEBHOOK_SECRET:
         return _is_local_dev()
@@ -139,14 +176,15 @@ async def _verify_flutterwave_transaction(
     expected_currency: str,
     transaction_id: str = "",
 ):
-    if not FLW_SECRET:
+    if not FLW_CLIENT_ID or not FLW_CLIENT_SECRET:
         return _is_local_dev(), None
 
+    token = await _get_flutterwave_access_token()
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.get(
             "https://api.flutterwave.com/v3/transactions/verify_by_reference",
             params={"tx_ref": tx_ref},
-            headers={"Authorization": f"Bearer {FLW_SECRET}"}
+            headers={"Authorization": f"Bearer {token}"}
         )
         resp.raise_for_status()
         data = resp.json()
@@ -498,7 +536,7 @@ async def payment_checkout(request: Request):
     if student["paid_access"]:
         return RedirectResponse("/student", 302)
 
-    if not FLW_SECRET:
+    if not FLW_CLIENT_ID or not FLW_CLIENT_SECRET:
         if _is_local_dev() and ALLOW_PAYMENT_DEV_BYPASS:
             tx_ref = f"dako-{student['id']}-{uuid.uuid4().hex[:8]}"
             now = datetime.utcnow().isoformat()[:19]
@@ -519,7 +557,7 @@ async def payment_checkout(request: Request):
 
         return HTMLResponse(_page("Payment",
             '<div class="container"><div class="alert alert-warn">Payment is not configured yet. '
-            'Set FLUTTERWAVE_SECRET_KEY in your .env file.</div></div>'))
+            'Set FLW_CLIENT_ID and FLW_CLIENT_SECRET in your .env file.</div></div>'))
 
     tx_ref = f"dako-{student['id']}-{uuid.uuid4().hex[:8]}"
     # Insert pending payment record
@@ -545,11 +583,12 @@ async def payment_checkout(request: Request):
         "payment_options": "card,mobilemoneyghana,mobilemoneyrwanda,mobilemoneyzambia,ussd,banktransfer",
     }
 
+    token = await _get_flutterwave_access_token()
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.post(
             "https://api.flutterwave.com/v3/payments",
             json=payload,
-            headers={"Authorization": f"Bearer {FLW_SECRET}"}
+            headers={"Authorization": f"Bearer {token}"}
         )
     data = resp.json()
     if data.get("status") == "success":

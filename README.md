@@ -20,6 +20,8 @@ Required keys for production:
 - `FLUTTERWAVE_PUBLIC_KEY`
 - `FLUTTERWAVE_WEBHOOK_SECRET`
 - `FLUTTERWAVE_ROUTER_URL`
+- `FLW_CLIENT_ID`
+- `FLW_CLIENT_SECRET`
 - `GOOGLE_API_KEY` or `GEMINI_API_KEY`
 - `ALLOW_PAYMENT_DEV_BYPASS=false`
 - `DATABASE_URL`
@@ -33,6 +35,7 @@ Production storage stack:
 
 - `DATABASE_URL` should point to a managed Postgres database from the Vercel Marketplace, preferably Neon on the free tier to start.
 - `BLOB_READ_WRITE_TOKEN` should come from a Vercel Blob store created in the project storage settings.
+- `FLW_CLIENT_ID` and `FLW_CLIENT_SECRET` are used to fetch the OAuth access token that Flutterwave requires for payment creation and verification.
 - Screenshot uploads use Blob when the token is present; local disk remains a development fallback only.
 
 | URL | Purpose |
