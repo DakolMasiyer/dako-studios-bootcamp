@@ -1,0 +1,15 @@
+.env
+.env.*
+venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.pytest_cache/
+data/
+uploads/
+scratch/
+memory/
+Module_*.docx
+notebooklm_knowledge_bank.md
+bootcamp_audit_report.md

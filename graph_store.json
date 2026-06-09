@@ -1,0 +1,784 @@
+{
+  "codebase_graph": [
+    {
+      "node_id": "ai_feedback_engine.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "generate_feedback"
+      ],
+      "imports": [
+        "db_adapter.py",
+        "assessment_logger.py"
+      ],
+      "depends_on": [
+        "db_adapter.py",
+        "assessment_logger.py"
+      ],
+      "depended_by": [
+        "ai_feedback_queue.py"
+      ],
+      "critical_functions": [
+        "generate_feedback"
+      ],
+      "known_issues": [],
+      "loc": 51,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "ai_feedback_queue.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "update_heartbeat",
+        "process_job_payload",
+        "ensure_worker_started",
+        "trigger_feedback_job"
+      ],
+      "imports": [
+        "db_adapter.py",
+        "db_adapter.py",
+        "ai_feedback_engine.py"
+      ],
+      "depends_on": [
+        "db_adapter.py",
+        "db_adapter.py",
+        "ai_feedback_engine.py"
+      ],
+      "depended_by": [
+        "bootcamp_app.py",
+        "rubric_engine.py"
+      ],
+      "critical_functions": [
+        "update_heartbeat",
+        "process_job_payload",
+        "ensure_worker_started",
+        "trigger_feedback_job"
+      ],
+      "known_issues": [],
+      "loc": 160,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "assessment_logger.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "log_assessment_event"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [
+        "ai_feedback_engine.py",
+        "assessment_session.py",
+        "bootcamp_app.py",
+        "rubric_engine.py"
+      ],
+      "critical_functions": [
+        "log_assessment_event"
+      ],
+      "known_issues": [],
+      "loc": 74,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "assessment_queue.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "update_heartbeat",
+        "reclaim_orphaned_jobs",
+        "process_job_payload",
+        "ensure_worker_started",
+        "trigger_grading_job",
+        "enqueue_grading_job"
+      ],
+      "imports": [
+        "db_adapter.py",
+        "db_adapter.py",
+        "db_adapter.py",
+        "db_adapter.py",
+        "rubric_engine.py"
+      ],
+      "depends_on": [
+        "db_adapter.py",
+        "db_adapter.py",
+        "db_adapter.py",
+        "db_adapter.py",
+        "rubric_engine.py"
+      ],
+      "depended_by": [
+        "bootcamp_app.py",
+        "submission_pipeline.py",
+        "worker.py"
+      ],
+      "critical_functions": [
+        "update_heartbeat",
+        "reclaim_orphaned_jobs",
+        "process_job_payload",
+        "ensure_worker_started",
+        "trigger_grading_job"
+      ],
+      "known_issues": [],
+      "loc": 297,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "assessment_session.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "get_active_attempt",
+        "sweep_expired_attempts",
+        "start_attempt",
+        "autosave_attempt",
+        "finalize_attempt"
+      ],
+      "imports": [
+        "db_adapter.py",
+        "assessment_logger.py"
+      ],
+      "depends_on": [
+        "db_adapter.py",
+        "assessment_logger.py"
+      ],
+      "depended_by": [
+        "bootcamp_app.py"
+      ],
+      "critical_functions": [
+        "get_active_attempt",
+        "sweep_expired_attempts",
+        "start_attempt",
+        "autosave_attempt",
+        "finalize_attempt"
+      ],
+      "known_issues": [],
+      "loc": 166,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "audit_lessons.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "count_words",
+        "split_sections",
+        "check_analogies",
+        "audit_lesson",
+        "main"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "count_words",
+        "split_sections",
+        "check_analogies",
+        "audit_lesson",
+        "main"
+      ],
+      "known_issues": [],
+      "loc": 231,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "bootcamp_app.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "home",
+        "login",
+        "register",
+        "logout",
+        "pricing",
+        "payment_checkout",
+        "payment_return",
+        "payment_webhook",
+        "student_dashboard",
+        "student_day"
+      ],
+      "imports": [
+        "payment_logger.py",
+        "db_adapter.py",
+        "submission_pipeline.py",
+        "assessment_session.py",
+        "exam_engine.py",
+        "assessment_logger.py",
+        "rubric_engine.py",
+        "ai_feedback_queue.py",
+        "assessment_logger.py",
+        "assessment_queue.py",
+        "assessment_logger.py",
+        "assessment_logger.py"
+      ],
+      "depends_on": [
+        "payment_logger.py",
+        "db_adapter.py",
+        "submission_pipeline.py",
+        "assessment_session.py",
+        "exam_engine.py",
+        "assessment_logger.py",
+        "rubric_engine.py",
+        "ai_feedback_queue.py",
+        "assessment_logger.py",
+        "assessment_queue.py",
+        "assessment_logger.py",
+        "assessment_logger.py"
+      ],
+      "depended_by": [
+        "submission_pipeline.py"
+      ],
+      "critical_functions": [
+        "home",
+        "login",
+        "register",
+        "logout",
+        "pricing"
+      ],
+      "known_issues": [],
+      "loc": 1414,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "dako_bootcamp_init_db.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "init_db"
+      ],
+      "imports": [
+        "db_adapter.py",
+        "db_migration.py"
+      ],
+      "depends_on": [
+        "db_adapter.py",
+        "db_migration.py"
+      ],
+      "depended_by": [],
+      "critical_functions": [
+        "init_db"
+      ],
+      "known_issues": [],
+      "loc": 541,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "db_adapter.py",
+      "type": "module",
+      "status": "PARTIALLY_BUILT",
+      "domain": "core",
+      "exports": [
+        "CursorProxy",
+        "DatabaseAdapter",
+        "SQLiteConnectionProxy",
+        "PostgresConnectionProxy",
+        "SQLiteAdapter",
+        "PostgresAdapter",
+        "get_adapter",
+        "rowcount",
+        "lastrowid",
+        "description"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [
+        "ai_feedback_engine.py",
+        "ai_feedback_queue.py",
+        "assessment_queue.py",
+        "assessment_session.py",
+        "bootcamp_app.py",
+        "dako_bootcamp_init_db.py",
+        "db_migration.py",
+        "exam_engine.py",
+        "migrate_db.py",
+        "rubric_engine.py",
+        "submission_pipeline.py"
+      ],
+      "critical_functions": [
+        "CursorProxy",
+        "DatabaseAdapter",
+        "SQLiteConnectionProxy",
+        "PostgresConnectionProxy",
+        "SQLiteAdapter"
+      ],
+      "known_issues": [],
+      "loc": 331,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "db_migration.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "extract_schema_sql",
+        "split_statements",
+        "bootstrap_from_bootstrap_file",
+        "main"
+      ],
+      "imports": [
+        "db_adapter.py"
+      ],
+      "depends_on": [
+        "db_adapter.py"
+      ],
+      "depended_by": [
+        "dako_bootcamp_init_db.py",
+        "migrate_db.py"
+      ],
+      "critical_functions": [
+        "extract_schema_sql",
+        "split_statements",
+        "bootstrap_from_bootstrap_file",
+        "main"
+      ],
+      "known_issues": [],
+      "loc": 199,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "exam_engine.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "materialize_exam_attempt",
+        "get_exam_state"
+      ],
+      "imports": [
+        "db_adapter.py"
+      ],
+      "depends_on": [
+        "db_adapter.py"
+      ],
+      "depended_by": [
+        "bootcamp_app.py"
+      ],
+      "critical_functions": [
+        "materialize_exam_attempt",
+        "get_exam_state"
+      ],
+      "known_issues": [],
+      "loc": 104,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "generate_lessons.py",
+      "type": "module",
+      "status": "PARTIALLY_BUILT",
+      "domain": "core",
+      "exports": [
+        "get_curriculum",
+        "save_lesson",
+        "generate_with_anthropic",
+        "generate_with_notebooklm",
+        "parse_response",
+        "main"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "get_curriculum",
+        "save_lesson",
+        "generate_with_anthropic",
+        "generate_with_notebooklm",
+        "parse_response"
+      ],
+      "known_issues": [],
+      "loc": 193,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "insert_lessons.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [],
+      "known_issues": [],
+      "loc": 742,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_db.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "column_exists",
+        "table_exists",
+        "migrate"
+      ],
+      "imports": [
+        "db_adapter.py",
+        "db_migration.py"
+      ],
+      "depends_on": [
+        "db_adapter.py",
+        "db_migration.py"
+      ],
+      "depended_by": [],
+      "critical_functions": [
+        "column_exists",
+        "table_exists",
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 167,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_phase2.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "migrate"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 66,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_phase3_rubrics.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "migrate"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 103,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_phase3.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "migrate"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 75,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_phase3b_feedback.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "migrate"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 51,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_phase3c_governance.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "migrate"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 39,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_phase4.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "migrate"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 99,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "migrate_phase4a_exam.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "migrate"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "migrate"
+      ],
+      "known_issues": [],
+      "loc": 65,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "payment_logger.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "log_payment_event"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [
+        "bootcamp_app.py"
+      ],
+      "critical_functions": [
+        "log_payment_event"
+      ],
+      "known_issues": [],
+      "loc": 58,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "rubric_engine.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "evaluate_submission",
+        "manual_override"
+      ],
+      "imports": [
+        "db_adapter.py",
+        "assessment_logger.py",
+        "ai_feedback_queue.py"
+      ],
+      "depends_on": [
+        "db_adapter.py",
+        "assessment_logger.py",
+        "ai_feedback_queue.py"
+      ],
+      "depended_by": [
+        "assessment_queue.py",
+        "bootcamp_app.py"
+      ],
+      "critical_functions": [
+        "evaluate_submission",
+        "manual_override"
+      ],
+      "known_issues": [],
+      "loc": 173,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "submission_logger.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "log_submission_event"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [
+        "submission_pipeline.py"
+      ],
+      "critical_functions": [
+        "log_submission_event"
+      ],
+      "known_issues": [],
+      "loc": 65,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "submission_pipeline.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "get_or_create_draft",
+        "save_structured_answer",
+        "process_safe_upload",
+        "finalize_submission"
+      ],
+      "imports": [
+        "bootcamp_app.py",
+        "db_adapter.py",
+        "submission_logger.py",
+        "assessment_queue.py"
+      ],
+      "depends_on": [
+        "bootcamp_app.py",
+        "db_adapter.py",
+        "submission_logger.py",
+        "assessment_queue.py"
+      ],
+      "depended_by": [
+        "bootcamp_app.py"
+      ],
+      "critical_functions": [
+        "get_or_create_draft",
+        "save_structured_answer",
+        "process_safe_upload",
+        "finalize_submission"
+      ],
+      "known_issues": [],
+      "loc": 177,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "update_curriculum.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "update_db"
+      ],
+      "imports": [],
+      "depends_on": [],
+      "depended_by": [],
+      "critical_functions": [
+        "update_db"
+      ],
+      "known_issues": [],
+      "loc": 209,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    },
+    {
+      "node_id": "worker.py",
+      "type": "module",
+      "status": "PRODUCTION_READY",
+      "domain": "core",
+      "exports": [
+        "main"
+      ],
+      "imports": [
+        "assessment_queue.py"
+      ],
+      "depends_on": [
+        "assessment_queue.py"
+      ],
+      "depended_by": [],
+      "critical_functions": [
+        "main"
+      ],
+      "known_issues": [],
+      "loc": 52,
+      "last_audited": "2026-06-09",
+      "audit_notes": ""
+    }
+  ],
+  "domain_map": {
+    "core": [
+      "ai_feedback_engine.py",
+      "ai_feedback_queue.py",
+      "assessment_logger.py",
+      "assessment_queue.py",
+      "assessment_session.py",
+      "audit_lessons.py",
+      "bootcamp_app.py",
+      "dako_bootcamp_init_db.py",
+      "db_adapter.py",
+      "db_migration.py",
+      "exam_engine.py",
+      "generate_lessons.py",
+      "insert_lessons.py",
+      "migrate_db.py",
+      "migrate_phase2.py",
+      "migrate_phase3_rubrics.py",
+      "migrate_phase3.py",
+      "migrate_phase3b_feedback.py",
+      "migrate_phase3c_governance.py",
+      "migrate_phase4.py",
+      "migrate_phase4a_exam.py",
+      "payment_logger.py",
+      "rubric_engine.py",
+      "submission_logger.py",
+      "submission_pipeline.py",
+      "update_curriculum.py",
+      "worker.py"
+    ]
+  },
+  "broken_nodes": [],
+  "missing_nodes": [],
+  "partially_built_nodes": [
+    "db_adapter.py",
+    "generate_lessons.py"
+  ],
+  "audit_ready": true,
+  "graphified_at": "2026-06-09T02:07:32.914584",
+  "total_files": 27,
+  "graphified_files": 27
+}

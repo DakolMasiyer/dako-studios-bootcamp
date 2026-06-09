@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "src": "bootcamp_app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "bootcamp_app.py"
+    }
+  ]
+}

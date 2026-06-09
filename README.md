@@ -1,0 +1,101 @@
+# Dako Studios Bootcamp
+
+Teaching platform for 100 concurrent students learning digital skills across a 20-day curriculum. Built with FastAPI + SQLite — zero external dependencies beyond FastAPI.
+
+## Quick Start
+
+```bash
+bash run.sh
+```
+
+The script creates a virtual environment, installs dependencies, initialises the database, and starts the server.
+
+Before first run, create and fill in the runtime config at:
+
+`/Users/dakolmasiyer/Projects/Dako Studios Bootcamp/.env`
+
+Required keys for production:
+
+- `FLUTTERWAVE_SECRET_KEY`
+- `FLUTTERWAVE_PUBLIC_KEY`
+- `FLUTTERWAVE_WEBHOOK_SECRET`
+- `FLUTTERWAVE_ROUTER_URL`
+- `GOOGLE_API_KEY` or `GEMINI_API_KEY`
+- `ALLOW_PAYMENT_DEV_BYPASS=false`
+
+Shared Flutterwave router project:
+
+`/Users/dakolmasiyer/Projects/Flutterwave`
+
+| URL | Purpose |
+|-----|---------|
+| http://localhost:8000 | Student portal (register / login) |
+| http://localhost:8000/coach | Coach dashboard |
+
+**Default coach credentials:** `admin` / `coach2024`
+
+## How It Works
+
+**Students**
+1. Register at the student portal
+2. Work through Day 1 to Day 20 in sequence
+3. Each day: read the mission instructions, complete the task, write a response, upload a screenshot
+4. Submit and wait for coach review
+5. Pass: next day unlocks automatically; Needs Revision: resubmit after addressing feedback
+
+**Coaches**
+1. Login at `/coach`
+2. Dashboard shows all pending submissions in chronological order
+3. View student answers and screenshots, write feedback, click Pass or Needs Revision
+4. Students tab shows all students with progress bars
+
+## Curriculum (20 Days)
+
+| Days | Theme |
+|------|-------|
+| 1–5  | Computer and file system fundamentals |
+| 6–10 | Internet, search, email, documents |
+| 11–15 | Research, cloud storage, cybersecurity |
+| 16–20 | Passwords, AI tools, prompt engineering, portfolio |
+
+## Project Structure
+
+```
+.
+├── bootcamp_app.py          # FastAPI application (all routes, HTML, CSS)
+├── dako_bootcamp_init_db.py # Database schema + 20-day curriculum seed
+├── requirements.txt         # fastapi, uvicorn, python-multipart
+├── run.sh                   # One-command startup script
+├── data/
+│   └── bootcamp.db          # SQLite database (WAL mode, auto-created)
+└── uploads/
+    └── screenshots/         # Student-uploaded screenshot files (auto-created)
+```
+
+## Technical Details
+
+- **Database:** SQLite with WAL mode — safe for ~100 concurrent readers/writers on a single server
+- **Sessions:** Stored in SQLite, delivered via `httponly` cookies (no in-memory state, survives restarts)
+- **Auth:** SHA-256 password hashing; separate student and coach session tables
+- **File uploads:** Saved to `uploads/screenshots/`, served via authenticated route
+- **HTML:** Inline CSS only — no CDN or external assets
+- **Auto-advance:** When a coach marks a submission as Pass, the student's current day increments automatically
+
+## Troubleshooting
+
+**Port already in use**
+```bash
+lsof -ti:8000 | xargs kill -9
+bash run.sh
+```
+
+**Reset the database**
+```bash
+rm data/bootcamp.db
+python3 dako_bootcamp_init_db.py
+```
+
+**Screenshots not saving**
+```bash
+mkdir -p uploads/screenshots
+```
