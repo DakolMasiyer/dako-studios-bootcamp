@@ -343,6 +343,14 @@ async def home(request: Request):
     if _get_student(request): return RedirectResponse("/student", 302)
     return HTMLResponse(_page("Welcome", _login_page()))
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    return HTMLResponse(_page("Login", _login_page(tab="login")))
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page():
+    return HTMLResponse(_page("Register", _login_page(tab="register")))
+
 def _login_page(error="", tab="login"):
     err = f'<div class="alert alert-error">{error}</div>' if error else ""
     return f"""<div class="login-wrap">
