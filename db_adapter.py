@@ -320,6 +320,8 @@ def get_adapter():
 
     print("Database backend: SQLite")
     sqlite_path = Path(os.getenv("SQLITE_PATH", "data/bootcamp.db"))
+    if (os.getenv("VERCEL") == "1" or bool(os.getenv("VERCEL_ENV"))) and not sqlite_path.is_absolute():
+        sqlite_path = Path("/tmp/bootcamp.db")
     sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     return SQLiteAdapter(sqlite_path)
 

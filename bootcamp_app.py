@@ -22,8 +22,21 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 load_dotenv()
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-DB_PATH  = Path(os.getenv("SQLITE_PATH", "data/bootcamp.db"))
-UPLOADS  = Path("uploads/screenshots")
+def _is_vercel_runtime() -> bool:
+    return os.getenv("VERCEL") == "1" or bool(os.getenv("VERCEL_ENV"))
+
+
+def _resolve_storage_path(raw_value: str, fallback_name: str) -> Path:
+    path = Path(raw_value)
+    if path.is_absolute():
+        return path
+    if _is_vercel_runtime():
+        return Path("/tmp") / fallback_name
+    return path
+
+
+DB_PATH  = _resolve_storage_path(os.getenv("SQLITE_PATH", "data/bootcamp.db"), "bootcamp.db")
+UPLOADS  = _resolve_storage_path(os.getenv("UPLOADS_DIR", "uploads/screenshots"), "uploads/screenshots")
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 UPLOADS.mkdir(parents=True, exist_ok=True)
 
@@ -47,6 +60,16 @@ query = db.query
 one = db.one
 run = db.run
 DB_POOL = db
+
+if _is_vercel_runtime():
+    try:
+        from dako_bootcamp_init_db import init_db as _bootstrap_bootcamp_db
+
+        if not DB_PATH.exists() or DB_PATH.stat().st_size == 0:
+            _bootstrap_bootcamp_db()
+    except Exception:
+        # Keep startup resilient; first request may still initialize the DB path.
+        pass
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 

@@ -12,7 +12,21 @@ from pathlib import Path
 
 from db_adapter import db
 
-DB_PATH = Path(os.getenv("SQLITE_PATH", "data/bootcamp.db"))
+def _is_vercel_runtime() -> bool:
+    return os.getenv("VERCEL") == "1" or bool(os.getenv("VERCEL_ENV"))
+
+
+def _resolve_db_path() -> Path:
+    raw_path = os.getenv("SQLITE_PATH", "data/bootcamp.db")
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path
+    if _is_vercel_runtime():
+        return Path("/tmp/bootcamp.db")
+    return path
+
+
+DB_PATH = _resolve_db_path()
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 CURRICULUM = {
