@@ -803,7 +803,10 @@ async def student_dashboard(request: Request):
     if flash == "success":
         flash_html = '<div class="alert alert-success">Payment confirmed! All 20 days are now unlocked.</div>'
 
-    subs = query("SELECT day, status FROM submissions WHERE student_id=?", (student["id"],))
+    subs = query(
+        "SELECT assessment_id AS day, grading_status AS status FROM submissions WHERE student_id=? AND submission_status != 'draft'",
+        (student["id"],),
+    )
     sub_map = {s["day"]: s["status"] for s in subs}
     title_map = {r["day"]: r["title"] for r in query("SELECT day, title FROM curriculum ORDER BY day")}
 
@@ -1245,8 +1248,8 @@ async def coach_students(request: Request):
 
     rows = ""
     for s in students:
-        passed  = one("SELECT COUNT(*) as c FROM submissions WHERE student_id=? AND status='approved'", (s["id"],))["c"]
-        pending = one("SELECT COUNT(*) as c FROM submissions WHERE student_id=? AND status='pending'",  (s["id"],))["c"]
+        passed  = one("SELECT COUNT(*) as c FROM submissions WHERE student_id=? AND grading_status='approved'", (s["id"],))["c"]
+        pending = one("SELECT COUNT(*) as c FROM submissions WHERE student_id=? AND grading_status='pending'",  (s["id"],))["c"]
         pct = int(passed / 20 * 100)
         paid_badge = '<span class="badge badge-paid" style="margin-left:6px">paid</span>' if s["paid_access"] else ""
         cohort_str = f'<span class="text-xs text-muted" style="margin-left:6px">{s["cohort_name"]}</span>' if s["cohort_name"] else ""
