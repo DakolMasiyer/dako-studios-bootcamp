@@ -18,7 +18,12 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
+
+try:
+    from vercel.blob import AsyncBlobClient
+except Exception:  # pragma: no cover - optional production dependency
+    AsyncBlobClient = None
 
 load_dotenv()
 
@@ -107,6 +112,9 @@ def _requires_payment(day_num: int, student: dict) -> bool:
 
 def _is_local_dev() -> bool:
     return BASE_URL.startswith("http://localhost") or BASE_URL.startswith("http://127.0.0.1")
+
+def _using_blob_storage() -> bool:
+    return bool(os.getenv("BLOB_READ_WRITE_TOKEN")) and AsyncBlobClient is not None
 
 def _verify_flutterwave_webhook(raw_body: bytes, headers) -> bool:
     if not FLW_WEBHOOK_SECRET:
@@ -1580,13 +1588,29 @@ async def coach_ops_audit(request: Request):
 
 # ─── File serving ─────────────────────────────────────────────────────────────
 
-@app.get("/uploads/{filename}")
+@app.get("/uploads/{filename:path}")
 async def serve_upload(filename: str, request: Request):
     if not _get_student(request) and not _get_coach(request):
         return RedirectResponse("/", 302)
     fpath = UPLOADS / filename
-    if not fpath.exists(): raise HTTPException(404)
-    return FileResponse(fpath)
+    if fpath.exists():
+        return FileResponse(fpath)
+
+    if _using_blob_storage():
+        client = AsyncBlobClient()
+        result = await client.get(filename, access="private")
+        if not result or result.status_code != 200 or result.stream is None:
+            raise HTTPException(404)
+        headers = {"X-Content-Type-Options": "nosniff"}
+        if result.blob.content_disposition:
+            headers["Content-Disposition"] = result.blob.content_disposition
+        return StreamingResponse(
+            result.stream,
+            media_type=result.blob.content_type or "application/octet-stream",
+            headers=headers,
+        )
+
+    raise HTTPException(404)
 
 # ─── Ops: Overrides ──────────────────────────────────────────────────────────
 

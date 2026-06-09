@@ -1,6 +1,7 @@
 from typing import Optional
 from datetime import datetime
 import json
+import os
 import secrets
 from pathlib import Path
 
@@ -10,8 +11,17 @@ from bootcamp_app import UPLOADS
 from db_adapter import db
 from submission_logger import log_submission_event
 
+try:
+    from vercel.blob import AsyncBlobClient
+except Exception:  # pragma: no cover - optional production dependency
+    AsyncBlobClient = None
+
 ALLOWED_MIMES = {"image/png", "image/jpeg", "application/pdf"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+def _using_blob_storage() -> bool:
+    return bool(os.getenv("BLOB_READ_WRITE_TOKEN")) and AsyncBlobClient is not None
 
 def get_or_create_draft(student_id: int, assessment_id: int) -> dict:
     try:
@@ -105,22 +115,36 @@ async def process_safe_upload(submission_id: int, file: UploadFile) -> None:
             raise HTTPException(400, f"Invalid file type {mime_type}. Allowed: {ALLOWED_MIMES}")
             
         log_submission_event("upload_started", submission_id, filename=file.filename, mime_type=mime_type)
-        
+
         ext = Path(file.filename).suffix or ".bin"
-        stored_path = f"{student_id}_{sub['assessment_id']}_{submission_id}_{secrets.token_hex(6)}{ext}"
-        full_path = UPLOADS / stored_path
-        
+        stored_path = f"submissions/{student_id}/{sub['assessment_id']}/{submission_id}/{secrets.token_hex(6)}{ext}"
+
         # Stream read to enforce size limit and save safely
         size = 0
-        with open(full_path, "wb") as out:
-            while chunk := await file.read(8192):
-                size += len(chunk)
-                if size > MAX_FILE_SIZE:
-                    out.close()
-                    full_path.unlink()
-                    log_submission_event("upload_failed", submission_id, error="File too large")
-                    raise HTTPException(400, f"File size exceeds limit of {MAX_FILE_SIZE} bytes")
-                out.write(chunk)
+        chunks = []
+        while chunk := await file.read(8192):
+            size += len(chunk)
+            if size > MAX_FILE_SIZE:
+                log_submission_event("upload_failed", submission_id, error="File too large")
+                raise HTTPException(400, f"File size exceeds limit of {MAX_FILE_SIZE} bytes")
+            chunks.append(chunk)
+
+        payload = b"".join(chunks)
+
+        if _using_blob_storage():
+            client = AsyncBlobClient()
+            await client.put(
+                stored_path,
+                payload,
+                access="private",
+                content_type=mime_type,
+                add_random_suffix=False,
+            )
+        else:
+            full_path = UPLOADS / stored_path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(full_path, "wb") as out:
+                out.write(payload)
                 
         # Persist metadata
         with db.transaction(immediate=True) as conn:

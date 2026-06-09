@@ -1,6 +1,6 @@
 # Dako Studios Bootcamp
 
-Teaching platform for 100 concurrent students learning digital skills across a 20-day curriculum. Built with FastAPI + SQLite — zero external dependencies beyond FastAPI.
+Teaching platform for 100 concurrent students learning digital skills across a 20-day curriculum. Built with FastAPI plus managed Postgres and Blob storage for production.
 
 ## Quick Start
 
@@ -22,10 +22,18 @@ Required keys for production:
 - `FLUTTERWAVE_ROUTER_URL`
 - `GOOGLE_API_KEY` or `GEMINI_API_KEY`
 - `ALLOW_PAYMENT_DEV_BYPASS=false`
+- `DATABASE_URL`
+- `BLOB_READ_WRITE_TOKEN`
 
 Shared Flutterwave router project:
 
 `/Users/dakolmasiyer/Projects/Flutterwave`
+
+Production storage stack:
+
+- `DATABASE_URL` should point to a managed Postgres database from the Vercel Marketplace, preferably Neon on the free tier to start.
+- `BLOB_READ_WRITE_TOKEN` should come from a Vercel Blob store created in the project storage settings.
+- Screenshot uploads use Blob when the token is present; local disk remains a development fallback only.
 
 | URL | Purpose |
 |-----|---------|
@@ -74,10 +82,10 @@ Shared Flutterwave router project:
 
 ## Technical Details
 
-- **Database:** SQLite with WAL mode — safe for ~100 concurrent readers/writers on a single server
+- **Database:** SQLite locally, PostgreSQL in production via `DATABASE_URL`
 - **Sessions:** Stored in SQLite, delivered via `httponly` cookies (no in-memory state, survives restarts)
 - **Auth:** SHA-256 password hashing; separate student and coach session tables
-- **File uploads:** Saved to `uploads/screenshots/`, served via authenticated route
+- **File uploads:** Saved to Vercel Blob in production when `BLOB_READ_WRITE_TOKEN` is set; local disk remains the fallback for development
 - **HTML:** Inline CSS only — no CDN or external assets
 - **Auto-advance:** When a coach marks a submission as Pass, the student's current day increments automatically
 
@@ -99,3 +107,9 @@ python3 dako_bootcamp_init_db.py
 ```bash
 mkdir -p uploads/screenshots
 ```
+
+**Switch to production storage**
+1. Create a managed Postgres database in Vercel Marketplace and copy its connection string into `DATABASE_URL`.
+2. Create a Vercel Blob store in the project Storage tab.
+3. Copy the generated token into `BLOB_READ_WRITE_TOKEN`.
+4. Redeploy the project so uploads and data use the managed services.
