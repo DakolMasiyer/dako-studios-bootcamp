@@ -18,14 +18,20 @@ Required keys for production:
 
 - `FLUTTERWAVE_SECRET_KEY`
 - `FLUTTERWAVE_PUBLIC_KEY`
-- `FLUTTERWAVE_WEBHOOK_SECRET`
+- `FLW_SECRET_HASH` or `FLUTTERWAVE_WEBHOOK_SECRET`
 - `FLUTTERWAVE_ROUTER_URL`
-- `FLW_CLIENT_ID`
-- `FLW_CLIENT_SECRET`
+- `FLW_CLIENT_SECRET` or `FLUTTERWAVE_SECRET_KEY`
 - `GOOGLE_API_KEY` or `GEMINI_API_KEY`
 - `ALLOW_PAYMENT_DEV_BYPASS=false`
 - `DATABASE_URL`
 - `BLOB_READ_WRITE_TOKEN`
+
+Flutterwave dashboard mapping:
+
+- Public key -> `FLUTTERWAVE_PUBLIC_KEY` or `FLW_CLIENT_ID`
+- Secret key -> `FLW_CLIENT_SECRET` or `FLUTTERWAVE_SECRET_KEY`
+- Encryption key -> only needed for direct card encryption flows; do not use it as your webhook secret
+- Webhook secret hash -> `FLW_SECRET_HASH` or `FLUTTERWAVE_WEBHOOK_SECRET`
 
 Shared Flutterwave router project:
 
@@ -35,7 +41,8 @@ Production storage stack:
 
 - `DATABASE_URL` should point to a managed Postgres database from the Vercel Marketplace, preferably Neon on the free tier to start.
 - `BLOB_READ_WRITE_TOKEN` should come from a Vercel Blob store created in the project storage settings.
-- `FLW_CLIENT_ID` and `FLW_CLIENT_SECRET` are used to fetch the OAuth access token that Flutterwave requires for payment creation and verification.
+- `FLW_CLIENT_SECRET` or `FLUTTERWAVE_SECRET_KEY` is used as the Flutterwave V3 bearer token for payment creation and verification.
+- `FLW_SECRET_HASH` is used to verify incoming webhooks with the `flutterwave-signature` header. If your dashboard only exposes a webhook secret field, store that value there.
 - Screenshot uploads use Blob when the token is present; local disk remains a development fallback only.
 
 | URL | Purpose |
