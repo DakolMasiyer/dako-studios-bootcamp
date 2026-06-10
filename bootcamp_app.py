@@ -802,6 +802,22 @@ async def reconcile_pending_payments(limit: int = 25):
     return summary
 
 
+@app.api_route("/internal/reconcile", methods=["GET", "POST"])
+async def internal_reconcile(request: Request):
+    # Server-to-server only: Vercel Cron sends GET with
+    # `Authorization: Bearer $CRON_SECRET`; Cloud Scheduler can POST with
+    # the same bearer token or an X-Internal-Token header.
+    expected = os.getenv("RECONCILE_TOKEN") or os.getenv("CRON_SECRET", "")
+    if not expected:
+        raise HTTPException(503, "Reconciliation token not configured (set RECONCILE_TOKEN or CRON_SECRET)")
+    auth = request.headers.get("authorization", "")
+    supplied = auth[7:] if auth.lower().startswith("bearer ") else request.headers.get("x-internal-token", "")
+    if not supplied or not secrets.compare_digest(supplied, expected):
+        raise HTTPException(401, "Invalid token")
+    summary = await reconcile_pending_payments(limit=50)
+    return {"status": "ok", "resolved": summary["verified"], **summary}
+
+
 @app.post("/coach/ops/payments/reconcile")
 async def coach_ops_reconcile_payments(request: Request):
     coach = _get_coach(request)
@@ -1178,12 +1194,13 @@ async def coach_dashboard(request: Request):
     if not coach: return RedirectResponse("/coach", 302)
     coach = dict(coach)
 
-    pending = query("""SELECT su.*, st.name as sname, st.email as semail, a.answer_text, f.stored_path as screenshot_url
+    pending = query("""SELECT su.*, su.assessment_id AS day, st.name as sname, st.email as semail, a.answer_text, f.stored_path as screenshot_url
         FROM submissions su 
         JOIN students st ON su.student_id=st.id
         LEFT JOIN submission_answers a ON a.submission_id = su.id
         LEFT JOIN submission_files f ON f.submission_id = su.id
-        WHERE su.submission_status='submitted' AND su.grading_status='pending' ORDER BY su.submitted_at ASC""")
+        WHERE su.submission_status='submitted' AND su.grading_status='pending'
+        ORDER BY su.submitted_at ASC""")
 
     total_students = one("SELECT COUNT(*) as c FROM students")["c"]
     total_graded   = one("SELECT COUNT(*) as c FROM submissions WHERE grading_status!='pending'")["c"]

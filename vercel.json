@@ -10,5 +10,11 @@
       "src": "/(.*)",
       "dest": "bootcamp_app.py"
     }
+  ],
+  "crons": [
+    {
+      "path": "/internal/reconcile",
+      "schedule": "*/10 * * * *"
+    }
   ]
 }

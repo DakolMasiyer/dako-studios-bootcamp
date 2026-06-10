@@ -20,6 +20,13 @@ def _get_gemini_api_key():
     return os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 
+def _is_local_dev() -> bool:
+    # Mirrors bootcamp_app._is_local_dev; duplicated here because importing
+    # bootcamp_app would create a circular import via ai_feedback_queue.
+    base_url = os.getenv("BASE_URL", "http://localhost:8000")
+    return base_url.startswith("http://localhost") or base_url.startswith("http://127.0.0.1")
+
+
 def _strip_code_fences(text: str) -> str:
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -154,6 +161,7 @@ def generate_feedback(grading_result_id: int):
 
     prompt = _build_prompt(grading_payload)
     ai_model_name = DEFAULT_GEMINI_MODEL
+    feedback_status = "visible"
 
     try:
         ai_result = _generate_with_gemini(prompt)
@@ -164,8 +172,24 @@ def generate_feedback(grading_result_id: int):
         if not any([generated_feedback, strengths, weaknesses, improvements]):
             raise RuntimeError("Gemini returned an empty feedback payload")
     except Exception as gemini_error:
+        log_assessment_event(
+            "feedback_generation_failed",
+            grading_payload["submission_id"],
+            grading_payload["rubric_id"],
+            grading_payload["rubric_version"],
+            error=str(gemini_error),
+        )
+        if not _is_local_dev():
+            # Never show students fabricated feedback in production: skip the
+            # DB write entirely so the feedback panel stays empty.
+            logger.error(
+                "Gemini feedback generation failed for grading_result %s in production; no feedback written: %s",
+                grading_result_id,
+                gemini_error,
+            )
+            return
         logger.warning(
-            "Gemini feedback generation failed for grading_result %s: %s. Falling back to mock response.",
+            "Gemini feedback generation failed for grading_result %s: %s. Falling back to mock response (hidden, local dev only).",
             grading_result_id,
             gemini_error,
         )
@@ -175,6 +199,7 @@ def generate_feedback(grading_result_id: int):
         weaknesses = fallback["weaknesses_summary"]
         improvements = fallback["improvement_suggestions"]
         ai_model_name = fallback["ai_model_name"]
+        feedback_status = "hidden"
 
     conn = db.get_connection()
     try:
@@ -192,7 +217,7 @@ def generate_feedback(grading_result_id: int):
                 generated_at,
                 feedback_status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'visible')
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 grading_result_id,
@@ -202,6 +227,7 @@ def generate_feedback(grading_result_id: int):
                 improvements,
                 ai_model_name,
                 now,
+                feedback_status,
             ),
         )
         conn.commit()

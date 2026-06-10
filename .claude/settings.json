@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Firecrawl__firecrawl_search",
+      "Bash(gcloud run services logs read *)"
+    ]
+  }
+}

@@ -41,6 +41,7 @@ def log_assessment_event(
         "manual_score_override",
         "feedback_generation_started",
         "feedback_generation_completed",
+        "feedback_generation_failed",
         "feedback_hidden",
         "feedback_regenerated",
         "session_started",
