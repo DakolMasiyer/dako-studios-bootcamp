@@ -1934,15 +1934,23 @@ async def serve_upload(filename: str, request: Request):
             filename = "https://" + filename[7:]
         if not filename.startswith("https://"):
             raise HTTPException(404)
-        from vercel.blob.errors import BlobNotFoundError as _BlobNotFoundError
-        client = AsyncBlobClient()
-        try:
-            meta = await client.head(filename)
-        except _BlobNotFoundError:
+        # Private blobs require the bearer token — the SDK's get() makes an
+        # unauthenticated fetch which returns 403. Proxy via httpx with auth header.
+        blob_token = os.getenv("BLOB_READ_WRITE_TOKEN", "")
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as http_client:
+            blob_resp = await http_client.get(
+                filename, headers={"Authorization": f"Bearer {blob_token}"}
+            )
+        if blob_resp.status_code == 404:
             raise HTTPException(404)
-        # Redirect to the signed download URL Vercel provides for private blobs.
-        # The student is already auth-checked above; the signed URL is time-limited.
-        return RedirectResponse(meta.download_url or meta.url, status_code=302)
+        if blob_resp.status_code != 200:
+            raise HTTPException(blob_resp.status_code)
+        import io
+        return StreamingResponse(
+            io.BytesIO(blob_resp.content),
+            media_type=blob_resp.headers.get("content-type", "application/octet-stream"),
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
     raise HTTPException(404)
 
