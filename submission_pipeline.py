@@ -133,19 +133,22 @@ async def process_safe_upload(submission_id: int, file: UploadFile) -> None:
 
         if _using_blob_storage():
             client = AsyncBlobClient()
-            await client.put(
+            blob_result = await client.put(
                 stored_path,
                 payload,
                 access="private",
                 content_type=mime_type,
                 add_random_suffix=False,
             )
+            # Store the full blob URL so serve_upload can call client.get(url)
+            # correctly — the SDK requires the full URL, not the relative pathname.
+            stored_path = blob_result.url
         else:
             full_path = UPLOADS / stored_path
             full_path.parent.mkdir(parents=True, exist_ok=True)
             with open(full_path, "wb") as out:
                 out.write(payload)
-                
+
         # Persist metadata
         with db.transaction(immediate=True) as conn:
             conn.execute("""

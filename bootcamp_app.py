@@ -12,7 +12,7 @@ import secrets
 import hashlib
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -99,21 +99,49 @@ if _is_vercel_runtime():
 def _hash(pwd):  return hashlib.sha256(pwd.encode()).hexdigest()
 def _token():    return secrets.token_urlsafe(32)
 
+def _session_cutoff() -> str:
+    return (datetime.utcnow() - timedelta(days=7)).isoformat()[:19]
+
 def _get_student(request: Request):
     tok = request.cookies.get("s_token")
     if not tok: return None
-    return one("SELECT s.* FROM students s JOIN sessions se ON s.id=se.student_id WHERE se.token=?", (tok,))
+    return one(
+        "SELECT s.* FROM students s JOIN sessions se ON s.id=se.student_id"
+        " WHERE se.token=? AND se.created_at > ?",
+        (tok, _session_cutoff()),
+    )
 
 def _get_coach(request: Request):
     tok = request.cookies.get("c_token")
     if not tok: return None
-    return one("SELECT c.* FROM coaches c JOIN coach_sessions cs ON c.id=cs.coach_id WHERE cs.token=?", (tok,))
+    return one(
+        "SELECT c.* FROM coaches c JOIN coach_sessions cs ON c.id=cs.coach_id"
+        " WHERE cs.token=? AND cs.created_at > ?",
+        (tok, _session_cutoff()),
+    )
 
 def _requires_payment(day_num: int, student: dict) -> bool:
     return day_num > FREE_DAYS and not student["paid_access"]
 
 def _is_local_dev() -> bool:
     return BASE_URL.startswith("http://localhost") or BASE_URL.startswith("http://127.0.0.1")
+
+@app.on_event("startup")
+async def _guard_default_credentials():
+    if not _is_vercel_runtime():
+        return
+    import logging
+    default_hash = _hash("coach2024")
+    row = one("SELECT id FROM coaches WHERE username='admin' AND password_hash=?", (default_hash,))
+    if row:
+        logging.critical(
+            "SECURITY: Default credentials (admin/coach2024) detected in production. "
+            "Set COACH_EMAIL and COACH_PASSWORD in .env before deploying."
+        )
+        raise RuntimeError(
+            "Default credentials detected in production — refusing to start. "
+            "Set COACH_EMAIL and COACH_PASSWORD in .env."
+        )
 
 def _using_blob_storage() -> bool:
     return bool(os.getenv("BLOB_READ_WRITE_TOKEN")) and AsyncBlobClient is not None
@@ -465,7 +493,7 @@ async def login(email: str = Form(...), password: str = Form(...)):
     tok = _token()
     run("INSERT INTO sessions (token, student_id) VALUES (?,?)", (tok, student["id"]))
     resp = RedirectResponse("/student", 302)
-    resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7)
+    resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
     return resp
 
 @app.post("/register")
@@ -477,7 +505,7 @@ async def register(name: str = Form(...), email: str = Form(...), password: str 
     tok = _token()
     run("INSERT INTO sessions (token, student_id) VALUES (?,?)", (tok, sid))
     resp = RedirectResponse("/student", 302)
-    resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7)
+    resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
     return resp
 
 @app.get("/logout")
@@ -1359,7 +1387,7 @@ async def coach_login(username: str = Form(...), password: str = Form(...)):
     tok = _token()
     run("INSERT INTO coach_sessions (token, coach_id) VALUES (?,?)", (tok, coach["id"]))
     resp = RedirectResponse("/coach/dashboard", 302)
-    resp.set_cookie("c_token", tok, httponly=True, max_age=86400 * 7)
+    resp.set_cookie("c_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
     return resp
 
 @app.get("/coach/logout")
@@ -1900,6 +1928,11 @@ async def serve_upload(filename: str, request: Request):
         return FileResponse(fpath)
 
     if _using_blob_storage():
+        # stored_path is now a full blob URL (https://...blob.vercel-storage.com/...)
+        # for all uploads created after the bug fix. Legacy relative-path entries
+        # (pre-fix) cannot be retrieved and fall through to 404.
+        if not filename.startswith("https://"):
+            raise HTTPException(404)
         try:
             from vercel._internal.blob.errors import BlobNotFoundError as _BlobNotFoundError
         except Exception:
@@ -1912,11 +1945,11 @@ async def serve_upload(filename: str, request: Request):
         if not result or result.status_code != 200 or result.stream is None:
             raise HTTPException(404)
         headers = {"X-Content-Type-Options": "nosniff"}
-        if result.blob.content_disposition:
+        if result.blob and result.blob.content_disposition:
             headers["Content-Disposition"] = result.blob.content_disposition
         return StreamingResponse(
             result.stream,
-            media_type=result.blob.content_type or "application/octet-stream",
+            media_type=(result.blob.content_type if result.blob else None) or "application/octet-stream",
             headers=headers,
         )
 
