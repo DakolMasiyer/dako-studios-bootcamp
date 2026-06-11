@@ -300,11 +300,24 @@ class PostgresAdapter(DatabaseAdapter):
         conn.autocommit = False
         return conn
 
+    def _is_connection_alive(self, conn) -> bool:
+        try:
+            conn.execute("SELECT 1")
+            return True
+        except Exception:
+            return False
+
     def get_connection(self):
         try:
             raw = self.pool.get(timeout=10)
         except queue.Empty as exc:
             raise RuntimeError("Database connection pool exhausted") from exc
+        if not self._is_connection_alive(raw):
+            try:
+                raw.close()
+            except Exception:
+                pass
+            raw = self._create_connection()
         return PostgresConnectionProxy(self, raw)
 
     def return_connection(self, conn):
