@@ -349,7 +349,7 @@ def _nav_student(student):
       <div class="progress-wrap" style="width:110px"><div class="progress-fill" style="width:{pct}%"></div></div>
       <span style="color:rgba(255,255,255,.55);font-size:.75rem">Day {student['current_day']}/20</span>
     </div>
-    <span class="nav-user">{student['name'].split()[0]}{lock_icon}</span>
+    <a href="/student/account" class="nav-user">{student['name'].split()[0]}{lock_icon}</a>
     <a href="/logout">Logout</a>
   </div>
 </nav>"""
@@ -366,7 +366,7 @@ def _nav_coach(coach):
     <a href="/coach/cohorts">Cohorts</a>
     <a href="/coach/payments">Payments</a>
     <a href="/coach/ops">Operations</a>
-    <span class="nav-user">{coach['name']}</span>
+    <a href="/coach/account" class="nav-user">{coach['name']}</a>
     <a href="/coach/logout">Logout</a>
   </div>
 </nav>"""
@@ -1081,6 +1081,150 @@ async def submit_day(day_num: int, request: Request, answer: str = Form(...), sc
 
     return RedirectResponse(f"/student/day/{day_num}", 302)
 
+# ─── Student: Account ─────────────────────────────────────────────────────────
+
+def _student_account_page(student, submissions=None, payments=None, error="", saved=False):
+    alert = ""
+    if saved:
+        alert = '<div class="alert alert-success">Settings saved.</div>'
+    elif error:
+        alert = f'<div class="alert alert-error">{error}</div>'
+
+    access = 'Full Access <span style="color:#16a34a">✓</span>' if student["paid_access"] else 'Free Trial (Days 1–3)'
+
+    # Submission history
+    sub_html = ""
+    if submissions is not None:
+        total = len(submissions)
+        passed = sum(1 for s in submissions if s["grading_status"] == "approved")
+        revision = sum(1 for s in submissions if s["grading_status"] == "revision")
+        rows = "".join(
+            f'<tr><td>Day {s["assessment_id"]}</td><td>{str(s["submitted_at"])[:10]}</td>'
+            f'<td><span class="badge badge-{"approved" if s["grading_status"]=="approved" else "revision" if s["grading_status"]=="revision" else "pending"}">'
+            f'{s["grading_status"].title()}</span></td></tr>'
+            for s in submissions[:20]
+        )
+        sub_html = f"""<hr class="divider"><h4>Submission History</h4>
+<div class="grid-stats mt-3" style="grid-template-columns:repeat(3,1fr)">
+  <div class="stat"><div class="stat-num">{total}</div><div class="stat-label">Submitted</div></div>
+  <div class="stat"><div class="stat-num" style="color:#16a34a">{passed}</div><div class="stat-label">Passed</div></div>
+  <div class="stat"><div class="stat-num" style="color:#d97706">{revision}</div><div class="stat-label">Revision</div></div>
+</div>
+<table class="table mt-3"><thead><tr><th>Day</th><th>Date</th><th>Status</th></tr></thead>
+<tbody>{"".join([rows]) if rows else "<tr><td colspan='3' class='text-muted'>No submissions yet.</td></tr>"}</tbody></table>"""
+
+    # Payment history
+    pay_html = ""
+    if payments:
+        rows = "".join(
+            f'<tr><td>{str(p["created_at"])[:10]}</td><td>${p["amount"]} {p["currency"]}</td>'
+            f'<td><span class="badge badge-{"approved" if p["status"]=="success" else "revision"}">{p["status"].title()}</span></td></tr>'
+            for p in payments
+        )
+        pay_html = f"""<hr class="divider"><h4>Payment History</h4>
+<table class="table mt-3"><thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+<tbody>{rows}</tbody></table>"""
+
+    return f"""<div class="container"><div class="card" style="max-width:560px;margin:0 auto">
+  <div class="card-title">Account Settings</div>
+  <hr class="divider">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:20px;font-size:.9rem">
+    <span class="text-muted">Email</span><span>{student['email']}</span>
+    <span class="text-muted">Member since</span><span>{str(student['created_at'])[:10]}</span>
+    <span class="text-muted">Progress</span><span>Day {student['current_day']} / 20</span>
+    <span class="text-muted">Access</span><span>{access}</span>
+  </div>
+  <hr class="divider">
+  {alert}
+  <form method="POST" action="/student/account">
+    <div class="form-group">
+      <label class="form-label">Display Name</label>
+      <input type="text" name="name" value="{student['name']}" required>
+    </div>
+    <hr class="divider">
+    <p class="text-muted" style="font-size:.85rem;margin-bottom:12px">Leave password fields blank to keep your current password.</p>
+    <div class="form-group">
+      <label class="form-label">Current Password</label>
+      <input type="password" name="current_password" autocomplete="current-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">New Password</label>
+      <input type="password" name="new_password" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirm New Password</label>
+      <input type="password" name="confirm_password" autocomplete="new-password">
+    </div>
+    <button class="btn btn-red">Save Changes</button>
+  </form>
+  {sub_html}
+  {pay_html}
+</div></div>"""
+
+@app.get("/student/account", response_class=HTMLResponse)
+async def student_account_get(request: Request):
+    student = _get_student(request)
+    if not student: return RedirectResponse("/", 302)
+    student = dict(student)
+    saved = request.query_params.get("saved", "")
+    submissions = query(
+        "SELECT assessment_id, grading_status, submitted_at FROM submissions "
+        "WHERE student_id=? AND submission_status != 'draft' ORDER BY submitted_at DESC",
+        (student["id"],)
+    )
+    payments = query(
+        "SELECT created_at, amount, currency, status FROM payments WHERE student_id=? ORDER BY created_at DESC",
+        (student["id"],)
+    )
+    return HTMLResponse(_page("Account Settings",
+        _student_account_page(student, submissions=submissions, payments=payments or None, saved=bool(saved)),
+        _nav_student(student)))
+
+@app.post("/student/account")
+async def student_account_post(request: Request,
+                                name: str = Form(...),
+                                current_password: str = Form(""),
+                                new_password: str = Form(""),
+                                confirm_password: str = Form("")):
+    student = _get_student(request)
+    if not student: return RedirectResponse("/", 302)
+    student = dict(student)
+
+    def err(msg):
+        submissions = query(
+            "SELECT assessment_id, grading_status, submitted_at FROM submissions "
+            "WHERE student_id=? AND submission_status != 'draft' ORDER BY submitted_at DESC",
+            (student["id"],)
+        )
+        payments = query(
+            "SELECT created_at, amount, currency, status FROM payments WHERE student_id=? ORDER BY created_at DESC",
+            (student["id"],)
+        )
+        return HTMLResponse(_page("Account Settings",
+            _student_account_page(student, submissions=submissions, payments=payments or None, error=msg),
+            _nav_student(student)))
+
+    name = name.strip()
+    if not name:
+        return err("Display name cannot be blank.")
+
+    new_hash = student["password_hash"]
+    if current_password or new_password or confirm_password:
+        if not current_password:
+            return err("Enter your current password to change it.")
+        if _hash(current_password) != student["password_hash"]:
+            return err("Current password is incorrect.")
+        if len(new_password) < 6:
+            return err("New password must be at least 6 characters.")
+        if new_password != confirm_password:
+            return err("New passwords do not match.")
+        if _hash(new_password) == student["password_hash"]:
+            return err("New password must be different from your current password.")
+        new_hash = _hash(new_password)
+
+    run("UPDATE students SET name=?, password_hash=? WHERE id=?", (name, new_hash, student["id"]))
+    return RedirectResponse("/student/account?saved=1", 302)
+
 # ─── Exams ────────────────────────────────────────────────────────────────────
 
 @app.post("/student/exam/{exam_id}/start")
@@ -1185,6 +1329,88 @@ async def coach_logout():
     resp = RedirectResponse("/coach", 302)
     resp.delete_cookie("c_token")
     return resp
+
+# ─── Coach: Account ───────────────────────────────────────────────────────────
+
+def _coach_account_page(coach, error="", saved=False):
+    alert = ""
+    if saved:
+        alert = '<div class="alert alert-success">Settings saved.</div>'
+    elif error:
+        alert = f'<div class="alert alert-error">{error}</div>'
+    return f"""<div class="container"><div class="card" style="max-width:560px;margin:0 auto">
+  <div class="card-title">Account Settings</div>
+  <hr class="divider">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:20px;font-size:.9rem">
+    <span class="text-muted">Username</span><span>{coach['username']}</span>
+    <span class="text-muted">Member since</span><span>{str(coach['created_at'])[:10]}</span>
+  </div>
+  <hr class="divider">
+  {alert}
+  <form method="POST" action="/coach/account">
+    <div class="form-group">
+      <label class="form-label">Display Name</label>
+      <input type="text" name="name" value="{coach['name']}" required>
+    </div>
+    <hr class="divider">
+    <p class="text-muted" style="font-size:.85rem;margin-bottom:12px">Leave password fields blank to keep your current password.</p>
+    <div class="form-group">
+      <label class="form-label">Current Password</label>
+      <input type="password" name="current_password" autocomplete="current-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">New Password</label>
+      <input type="password" name="new_password" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirm New Password</label>
+      <input type="password" name="confirm_password" autocomplete="new-password">
+    </div>
+    <button class="btn btn-red">Save Changes</button>
+  </form>
+</div></div>"""
+
+@app.get("/coach/account", response_class=HTMLResponse)
+async def coach_account_get(request: Request):
+    coach = _get_coach(request)
+    if not coach: return RedirectResponse("/coach", 302)
+    coach = dict(coach)
+    saved = request.query_params.get("saved", "")
+    return HTMLResponse(_page("Account Settings", _coach_account_page(coach, saved=bool(saved)), _nav_coach(coach)))
+
+@app.post("/coach/account")
+async def coach_account_post(request: Request,
+                              name: str = Form(...),
+                              current_password: str = Form(""),
+                              new_password: str = Form(""),
+                              confirm_password: str = Form("")):
+    coach = _get_coach(request)
+    if not coach: return RedirectResponse("/coach", 302)
+    coach = dict(coach)
+
+    def err(msg):
+        return HTMLResponse(_page("Account Settings", _coach_account_page(coach, error=msg), _nav_coach(coach)))
+
+    name = name.strip()
+    if not name:
+        return err("Display name cannot be blank.")
+
+    new_hash = coach["password_hash"]
+    if current_password or new_password or confirm_password:
+        if not current_password:
+            return err("Enter your current password to change it.")
+        if _hash(current_password) != coach["password_hash"]:
+            return err("Current password is incorrect.")
+        if len(new_password) < 6:
+            return err("New password must be at least 6 characters.")
+        if new_password != confirm_password:
+            return err("New passwords do not match.")
+        if _hash(new_password) == coach["password_hash"]:
+            return err("New password must be different from your current password.")
+        new_hash = _hash(new_password)
+
+    run("UPDATE coaches SET name=?, password_hash=? WHERE id=?", (name, new_hash, coach["id"]))
+    return RedirectResponse("/coach/account?saved=1", 302)
 
 # ─── Coach: Dashboard (grading) ───────────────────────────────────────────────
 
