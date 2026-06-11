@@ -1636,8 +1636,15 @@ async def serve_upload(filename: str, request: Request):
         return FileResponse(fpath)
 
     if _using_blob_storage():
+        try:
+            from vercel._internal.blob.errors import BlobNotFoundError as _BlobNotFoundError
+        except Exception:
+            _BlobNotFoundError = Exception
         client = AsyncBlobClient()
-        result = await client.get(filename, access="private")
+        try:
+            result = await client.get(filename, access="private")
+        except _BlobNotFoundError:
+            raise HTTPException(404)
         if not result or result.status_code != 200 or result.stream is None:
             raise HTTPException(404)
         headers = {"X-Content-Type-Options": "nosniff"}
