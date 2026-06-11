@@ -1931,6 +1931,9 @@ async def serve_upload(filename: str, request: Request):
         # stored_path is now a full blob URL (https://...blob.vercel-storage.com/...)
         # for all uploads created after the bug fix. Legacy relative-path entries
         # (pre-fix) cannot be retrieved and fall through to 404.
+        # HTTP path normalisation collapses https:// → https:/ in transit; restore it.
+        if filename.startswith("https:/") and not filename.startswith("https://"):
+            filename = "https://" + filename[7:]
         if not filename.startswith("https://"):
             raise HTTPException(404)
         try:
