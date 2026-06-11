@@ -134,13 +134,13 @@ async def _guard_default_credentials():
     default_hash = _hash("coach2024")
     row = one("SELECT id FROM coaches WHERE username='admin' AND password_hash=?", (default_hash,))
     if row:
+        # Log at CRITICAL so the alert surfaces in Vercel function logs.
+        # We do NOT crash here — crashing would prevent the coach from logging
+        # in to rotate the credential. Change the password via /coach/account
+        # then this warning will stop appearing.
         logging.critical(
-            "SECURITY: Default credentials (admin/coach2024) detected in production. "
-            "Set COACH_EMAIL and COACH_PASSWORD in .env before deploying."
-        )
-        raise RuntimeError(
-            "Default credentials detected in production — refusing to start. "
-            "Set COACH_EMAIL and COACH_PASSWORD in .env."
+            "SECURITY WARNING: Default credentials (admin/coach2024) are active in "
+            "production. Log in to /coach/account and change the password immediately."
         )
 
 def _using_blob_storage() -> bool:
