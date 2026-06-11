@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import os
 import queue
 import re
@@ -7,6 +8,21 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Optional
+
+
+def _normalize_row(row):
+    """Convert datetime/date objects in a Postgres dict row to ISO strings."""
+    if row is None or not isinstance(row, dict):
+        return row
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, datetime.datetime):
+            out[k] = v.isoformat(sep=" ", timespec="seconds")
+        elif isinstance(v, datetime.date):
+            out[k] = v.isoformat()
+        else:
+            out[k] = v
+    return out
 
 
 AUTO_ID_TABLES = {
@@ -43,10 +59,14 @@ INSERT_RE = re.compile(
 
 
 class CursorProxy:
-    def __init__(self, cursor: Any, lastrowid: Any = None, buffered_row: Any = None):
+    def __init__(self, cursor: Any, lastrowid: Any = None, buffered_row: Any = None, normalize=False):
         self._cursor = cursor
         self._lastrowid = lastrowid
         self._buffered_row = buffered_row
+        self._normalize = normalize
+
+    def _norm(self, row):
+        return _normalize_row(row) if self._normalize else row
 
     @property
     def rowcount(self) -> int:
@@ -66,21 +86,22 @@ class CursorProxy:
         if self._buffered_row is not None:
             row = self._buffered_row
             self._buffered_row = None
-            return row
-        return self._cursor.fetchone()
+            return self._norm(row)
+        return self._norm(self._cursor.fetchone())
 
     def fetchall(self):
         rows = []
         first = self.fetchone()
         if first is not None:
             rows.append(first)
-        rows.extend(self._cursor.fetchall())
+        rows.extend(self._norm(r) for r in self._cursor.fetchall())
         return rows
 
     def __iter__(self):
         if self._buffered_row is not None:
             yield self.fetchone()
-        yield from self._cursor
+        for row in self._cursor:
+            yield self._norm(row)
 
 
 class DatabaseAdapter:
@@ -242,6 +263,17 @@ class PostgresConnectionProxy(_BaseConnectionProxy):
 
         update_clause = ", ".join(f"{col}=EXCLUDED.{col}" for col in update_columns)
         return f"INSERT INTO curriculum ({', '.join(columns)}) VALUES ({values}) ON CONFLICT (day) DO UPDATE SET {update_clause}"
+
+    def execute(self, sql, params=()):
+        sql, needs_lastrowid = self._translate_sql(sql)
+        cur = self._raw_conn.execute(sql, params)
+        buffered_row = None
+        lastrowid = None
+        if needs_lastrowid and getattr(cur, "description", None):
+            buffered_row = cur.fetchone()
+            if buffered_row is not None:
+                lastrowid = buffered_row.get("id") if isinstance(buffered_row, dict) else None
+        return CursorProxy(cur, lastrowid=lastrowid, buffered_row=buffered_row, normalize=True)
 
     def _begin(self, immediate=False):
         self._raw_conn.execute("BEGIN")
