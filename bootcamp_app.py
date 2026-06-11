@@ -1928,33 +1928,21 @@ async def serve_upload(filename: str, request: Request):
         return FileResponse(fpath)
 
     if _using_blob_storage():
-        # stored_path is now a full blob URL (https://...blob.vercel-storage.com/...)
-        # for all uploads created after the bug fix. Legacy relative-path entries
-        # (pre-fix) cannot be retrieved and fall through to 404.
+        # stored_path is a full blob URL (https://...blob.vercel-storage.com/...)
         # HTTP path normalisation collapses https:// → https:/ in transit; restore it.
         if filename.startswith("https:/") and not filename.startswith("https://"):
             filename = "https://" + filename[7:]
         if not filename.startswith("https://"):
             raise HTTPException(404)
-        try:
-            from vercel._internal.blob.errors import BlobNotFoundError as _BlobNotFoundError
-        except Exception:
-            _BlobNotFoundError = Exception
+        from vercel.blob.errors import BlobNotFoundError as _BlobNotFoundError
         client = AsyncBlobClient()
         try:
-            result = await client.get(filename, access="private")
+            meta = await client.head(filename)
         except _BlobNotFoundError:
             raise HTTPException(404)
-        if not result or result.status_code != 200 or result.stream is None:
-            raise HTTPException(404)
-        headers = {"X-Content-Type-Options": "nosniff"}
-        if result.blob and result.blob.content_disposition:
-            headers["Content-Disposition"] = result.blob.content_disposition
-        return StreamingResponse(
-            result.stream,
-            media_type=(result.blob.content_type if result.blob else None) or "application/octet-stream",
-            headers=headers,
-        )
+        # Redirect to the signed download URL Vercel provides for private blobs.
+        # The student is already auth-checked above; the signed URL is time-limited.
+        return RedirectResponse(meta.download_url or meta.url, status_code=302)
 
     raise HTTPException(404)
 
