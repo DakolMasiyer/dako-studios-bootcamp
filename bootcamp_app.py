@@ -312,6 +312,15 @@ textarea{resize:vertical;min-height:110px}
 .cohort-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #f0f2f5}
 .cohort-row:last-child{border-bottom:none}
 @media(max-width:768px){.grid-2{grid-template-columns:1fr}.grid-stats{grid-template-columns:1fr 1fr}.grid-days{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}.pricing-hero{padding:48px 24px}.pricing-hero h1{font-size:1.75rem}}
+.nav-profile{position:relative}
+.nav-profile-btn{background:rgba(255,255,255,.12);border:none;color:#fff;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;flex-shrink:0}
+.nav-profile-btn:hover{background:rgba(255,255,255,.22)}
+.nav-dropdown{position:absolute;right:0;top:calc(100% + 8px);background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:188px;z-index:200;display:none;overflow:hidden}
+.nav-dropdown.open{display:block}
+.nav-dropdown-header{padding:11px 16px;border-bottom:1px solid #f0f2f5;font-size:.78rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-dropdown a{display:block;padding:10px 16px;color:#1a1a1a !important;text-decoration:none;font-size:.875rem;transition:background .1s}
+.nav-dropdown a:hover{background:#f9fafb;color:#1a1a1a !important}
+.nav-dropdown hr{border:none;border-top:1px solid #f0f2f5;margin:4px 0}
 """
 
 JS = """
@@ -321,6 +330,17 @@ function showTab(btn, id) {
     document.getElementById(id).classList.add('active');
     btn.classList.add('active');
 }
+function toggleProfileMenu(btn) {
+    const menu = btn.nextElementSibling;
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.nav-dropdown.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.nav-profile')) {
+        document.querySelectorAll('.nav-dropdown.open').forEach(m => m.classList.remove('open'));
+    }
+});
 """
 
 def _page(title, body, nav=""):
@@ -341,7 +361,7 @@ def _page(title, body, nav=""):
 
 def _nav_student(student):
     pct = max(0, int((student["current_day"] - 1) / 20 * 100))
-    lock_icon = "" if student["paid_access"] else ' <span class="nav-badge">FREE</span>'
+    free_badge = '' if student["paid_access"] else ' <span class="nav-badge">FREE</span>'
     return f"""<nav class="nav">
   <div class="nav-brand">DAKO <span class="r">STUDIOS</span> BOOTCAMP</div>
   <div class="nav-right">
@@ -349,8 +369,17 @@ def _nav_student(student):
       <div class="progress-wrap" style="width:110px"><div class="progress-fill" style="width:{pct}%"></div></div>
       <span style="color:rgba(255,255,255,.55);font-size:.75rem">Day {student['current_day']}/20</span>
     </div>
-    <a href="/student/account" class="nav-user">{student['name'].split()[0]}{lock_icon}</a>
-    <a href="/logout">Logout</a>
+    <div class="nav-profile">
+      <button class="nav-profile-btn" onclick="toggleProfileMenu(this)" aria-label="Profile menu">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </button>
+      <div class="nav-dropdown">
+        <div class="nav-dropdown-header">{student['name'].split()[0]}{free_badge}</div>
+        <a href="/student/account">Account Settings</a>
+        <hr>
+        <a href="/logout">Logout</a>
+      </div>
+    </div>
   </div>
 </nav>"""
 
@@ -366,8 +395,17 @@ def _nav_coach(coach):
     <a href="/coach/cohorts">Cohorts</a>
     <a href="/coach/payments">Payments</a>
     <a href="/coach/ops">Operations</a>
-    <a href="/coach/account" class="nav-user">{coach['name']}</a>
-    <a href="/coach/logout">Logout</a>
+    <div class="nav-profile">
+      <button class="nav-profile-btn" onclick="toggleProfileMenu(this)" aria-label="Profile menu">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </button>
+      <div class="nav-dropdown">
+        <div class="nav-dropdown-header">{coach['name']}</div>
+        <a href="/coach/account">Account Settings</a>
+        <hr>
+        <a href="/coach/logout">Logout</a>
+      </div>
+    </div>
   </div>
 </nav>"""
 
