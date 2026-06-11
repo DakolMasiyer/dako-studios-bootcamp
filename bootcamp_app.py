@@ -671,7 +671,7 @@ async def payment_webhook(request: Request):
         # Handle reconciliation failure or actual mismatch
         run("UPDATE webhook_logs SET status='failed_verification' WHERE id=?", (webhook_id,))
         run(
-            "UPDATE payments SET reconciliation_attempts=reconciliation_attempts+1, last_reconciliation_error=?, raw_provider_payload=?, updated_at=datetime('now') WHERE id=?",
+            "UPDATE payments SET reconciliation_attempts=reconciliation_attempts+1, last_reconciliation_error=?, raw_provider_payload=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (error_msg, json.dumps(body), payment["id"])
         )
         log_payment_event("reconciliation_retry", tx_ref, payment["student_id"], payment["amount"], flw_ref=flw_ref, error=error_msg)
@@ -698,7 +698,7 @@ async def payment_webhook(request: Request):
     except Exception as e:
         run("UPDATE webhook_logs SET status='failed_db_lock' WHERE id=?", (webhook_id,))
         run(
-            "UPDATE payments SET reconciliation_attempts=reconciliation_attempts+1, last_reconciliation_error=?, raw_provider_payload=?, updated_at=datetime('now') WHERE id=?",
+            "UPDATE payments SET reconciliation_attempts=reconciliation_attempts+1, last_reconciliation_error=?, raw_provider_payload=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (str(e), json.dumps(body), payment["id"])
         )
         log_payment_event("reconciliation_retry", tx_ref, payment["student_id"], payment["amount"], flw_ref=flw_ref, error=f"DB error: {str(e)}")
@@ -742,7 +742,7 @@ async def reconcile_pending_payments(limit: int = 25):
                     SET reconciliation_attempts=reconciliation_attempts+1,
                         last_reconciliation_error=?,
                         raw_provider_payload=COALESCE(raw_provider_payload, ?),
-                        updated_at=datetime('now')
+                        updated_at=CURRENT_TIMESTAMP
                     WHERE id=?
                     """,
                     (str(provider_payload_or_error), json.dumps({"tx_ref": tx_ref}), payment["id"]),
@@ -793,7 +793,7 @@ async def reconcile_pending_payments(limit: int = 25):
                 UPDATE payments
                 SET reconciliation_attempts=reconciliation_attempts+1,
                     last_reconciliation_error=?,
-                    updated_at=datetime('now')
+                    updated_at=CURRENT_TIMESTAMP
                 WHERE id=?
                 """,
                 (str(exc), payment["id"]),
