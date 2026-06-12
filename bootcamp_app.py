@@ -19,6 +19,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
+from translations import get_t, SUPPORTED_LANGS
 
 try:
     from vercel.blob import AsyncBlobClient
@@ -122,6 +123,25 @@ def _get_coach(request: Request):
 
 def _requires_payment(day_num: int, student: dict) -> bool:
     return day_num > FREE_DAYS and not student["paid_access"]
+
+# ─── Language + i18n ──────────────────────────────────────────────────────────
+
+VALID_LANGS = {"en", "pcm", "yo", "ha", "ig"}
+
+def _get_lang(request: Request) -> str:
+    lang = request.cookies.get("lang_pref", "en")
+    return lang if lang in VALID_LANGS else "en"
+
+def _lang_switcher(current_lang: str) -> str:
+    labels = {"en": "EN", "pcm": "PCM", "yo": "YO", "ha": "HA", "ig": "IG"}
+    btns = "".join(
+        f'<form method="POST" action="/set-language" style="display:inline;margin:0">'
+        f'<input type="hidden" name="lang" value="{code}">'
+        f'<button type="submit" class="lang-btn{"  lang-btn-active" if code == current_lang else ""}">{labels[code]}</button>'
+        f'</form>'
+        for code in SUPPORTED_LANGS
+    )
+    return f'<div class="lang-switcher">{btns}</div>'
 
 def _is_local_dev() -> bool:
     return BASE_URL.startswith("http://localhost") or BASE_URL.startswith("http://127.0.0.1")
@@ -351,6 +371,220 @@ textarea{resize:vertical;min-height:110px}
 .nav-dropdown hr{border:none;border-top:1px solid #f0f2f5;margin:4px 0}
 """
 
+LANDING_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+:root{--red:#E11D2E;--red2:#c91828;--red-dim:rgba(225,29,46,.10);--red-glow:rgba(225,29,46,.25);--black:#0A0A0A;--g1:#111111;--g2:#1A1A1A;--g3:#242424;--g4:#333333;--muted:#777777;--light:#BBBBBB;--white:#FFFFFF}
+.landing-page{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.65;overflow-x:hidden;min-height:100vh}
+.landing-page *{box-sizing:border-box}
+/* noise overlay */
+.landing-page::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.5}
+/* ── NAV ── */
+.l-nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:64px;background:rgba(10,10,10,.96);backdrop-filter:blur(16px);border-bottom:1px solid var(--g3)}
+.l-nav-brand{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:var(--white);text-decoration:none}
+.l-nav-brand em{color:var(--red);font-style:normal}
+.l-nav-right{display:flex;align-items:center;gap:12px}
+.l-nav-link{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;padding:0 14px;height:64px;display:flex;align-items:center;transition:color .2s}
+.l-nav-link:hover{color:var(--white)}
+.l-nav-cta{background:var(--red);color:var(--white)!important;padding:0 20px!important;font-weight:700!important;border-bottom:none!important}
+.l-nav-cta:hover{background:var(--red2)!important}
+/* lang switcher */
+.lang-switcher{display:flex;gap:4px}
+.lang-btn{background:transparent;border:1px solid var(--g4);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 10px;border-radius:3px;cursor:pointer;transition:all .15s}
+.lang-btn:hover{border-color:var(--white);color:var(--white)}
+.lang-btn-active{border-color:var(--red);color:var(--red)}
+/* ── HERO ── */
+.l-hero{position:relative;min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;overflow:hidden;padding:80px 48px;margin-top:64px}
+.l-hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 100%,rgba(225,29,46,.08) 0%,transparent 70%),linear-gradient(180deg,var(--black) 0%,var(--g1) 100%)}
+.l-hero-lines{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:80px 80px}
+.l-hero-content{position:relative;z-index:2;max-width:980px;text-align:center}
+.l-eyebrow{display:inline-flex;align-items:center;gap:10px;margin-bottom:32px;animation:fadeUpL .7s ease both}
+.l-eyebrow-dot{width:6px;height:6px;background:var(--red);border-radius:50%;animation:pulseL 2s ease infinite}
+@keyframes pulseL{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+.l-eyebrow-text{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+.l-hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(64px,11vw,120px);line-height:.88;letter-spacing:2px;margin-bottom:24px;animation:fadeUpL .7s .08s ease both}
+.l-hero h1 .l-accent{color:var(--red)}
+.l-hero-sub{font-size:18px;color:var(--light);max-width:580px;margin:0 auto 48px;animation:fadeUpL .7s .2s ease both}
+@keyframes fadeUpL{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+/* ── CONTAINER ── */
+.l-container{max-width:1080px;margin:0 auto;padding:0 48px}
+.l-sec-label{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:12px}
+.l-sec-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,5vw,60px);line-height:.95;letter-spacing:1px;margin-bottom:20px}
+.l-sec-desc{font-size:16px;color:var(--light);max-width:520px;font-weight:400}
+/* ── COURSE CARDS ── */
+.l-courses{padding:100px 0;border-top:1px solid var(--g3)}
+.l-course-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:var(--g3);border-radius:6px;overflow:hidden;margin-top:56px}
+.l-course-card{background:var(--black);padding:48px 40px;position:relative;overflow:hidden;transition:background .2s}
+.l-course-card:hover{background:var(--g2)}
+.l-course-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--red);transform:scaleX(0);transition:transform .3s;transform-origin:left}
+.l-course-card:hover::before{transform:scaleX(1)}
+.l-course-badge{display:inline-flex;align-items:center;gap:6px;background:var(--red-dim);border:1px solid rgba(225,29,46,.3);color:var(--red);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border-radius:2px;margin-bottom:20px}
+.l-course-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;line-height:1;margin-bottom:16px}
+.l-course-desc{font-size:14px;color:var(--light);line-height:1.7;margin-bottom:28px;max-width:400px}
+.l-course-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
+.l-pill{display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--g4);border-radius:100px;font-size:12px;font-weight:600;color:var(--light)}
+.l-pill-dot{width:5px;height:5px;background:var(--red);border-radius:50%;flex-shrink:0}
+.l-price-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:8px}
+.l-price{font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:1;color:var(--white)}
+.l-price-sub{font-size:12px;color:var(--muted);padding-bottom:8px}
+.l-cta{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:var(--red);color:var(--white);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;border:none;border-radius:3px;cursor:pointer;text-decoration:none;transition:all .2s;margin-top:12px}
+.l-cta:hover{background:var(--red2);transform:translateY(-2px)}
+.l-cta-ghost{background:transparent;border:1px solid var(--g4);color:var(--white)}
+.l-cta-ghost:hover{border-color:var(--white);background:transparent}
+/* ── SECTION ── */
+.l-section{padding:100px 0;border-top:1px solid var(--g3)}
+.l-section.dark{background:var(--g1)}
+/* ── WHY CARDS ── */
+.l-why-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;background:var(--g3);border-radius:6px;overflow:hidden;margin-top:56px}
+.l-why-card{background:var(--black);padding:36px 28px;transition:background .2s}
+.l-why-card:hover{background:var(--g2)}
+.l-why-card h4{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:12px}
+.l-why-card p{font-size:13px;color:var(--muted);line-height:1.7}
+/* ── CURRICULUM ── */
+.l-weeks{display:flex;flex-direction:column;gap:3px;margin-top:56px}
+.l-week{background:var(--black);border:1px solid var(--g3);border-radius:3px;overflow:hidden}
+.l-week summary{display:flex;align-items:center;gap:18px;padding:20px 24px;cursor:pointer;user-select:none;list-style:none;transition:background .2s}
+.l-week summary::-webkit-details-marker{display:none}
+.l-week summary:hover{background:var(--g2)}
+.l-week-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--red);min-width:60px}
+.l-week-name{flex:1;font-weight:600;font-size:14px}
+.l-week-arr{width:20px;height:20px;border:1px solid var(--g4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);transition:transform .3s;flex-shrink:0}
+details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--red);color:var(--red)}
+.l-week-days{padding:0 24px 20px;display:flex;flex-direction:column;gap:3px}
+.l-day-row{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--g2);border-radius:3px}
+.l-day-num{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--red);min-width:48px}
+.l-day-title{flex:1;font-size:13px;font-weight:500}
+.l-day-badge{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border-radius:2px;flex-shrink:0}
+.l-day-free{background:var(--red-dim);color:var(--red);border:1px solid rgba(225,29,46,.3)}
+.l-day-locked{background:var(--g3);color:var(--muted)}
+/* ── PAYWALL CALLOUT ── */
+.l-paywall{padding:80px 48px;background:linear-gradient(135deg,var(--g2),var(--black));border-top:1px solid var(--g3);border-bottom:1px solid var(--g3);text-align:center}
+.l-paywall h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,6vw,72px);letter-spacing:2px;margin-bottom:12px}
+.l-paywall p{font-size:15px;color:var(--light);max-width:540px;margin:0 auto 32px}
+/* ── TRANSFORM GRID ── */
+.l-transform-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:var(--g3);border-radius:6px;overflow:hidden;margin-top:56px}
+.l-transform-col{background:var(--g1);padding:48px 40px}
+.l-transform-col.after-col{background:var(--black)}
+.l-transform-header{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.l-transform-tag{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border-radius:2px}
+.l-tag-before{background:var(--g3);color:var(--muted)}
+.l-tag-after{background:var(--red);color:var(--white)}
+.l-transform-list{display:flex;flex-direction:column;gap:14px;list-style:none}
+.l-transform-list li{display:flex;align-items:flex-start;gap:12px;font-size:15px}
+.l-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:2px}
+.l-icon-x{background:var(--g3);color:var(--muted)}
+.l-icon-check{background:var(--red-dim);color:var(--red);border:1px solid rgba(225,29,46,.3)}
+.l-muted-item{color:var(--muted)}
+.l-bright-item{color:var(--white);font-weight:500}
+/* ── FRAMEWORK ── */
+.l-stages{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;background:var(--g3);border-radius:6px;overflow:hidden;margin-top:56px;margin-bottom:16px}
+.l-stage{background:var(--black);padding:24px 12px;text-align:center;cursor:pointer;transition:background .2s;position:relative;overflow:hidden}
+.l-stage:hover,.l-stage.l-stage-active{background:var(--g2)}
+.l-stage.l-stage-active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--red)}
+.l-stage-num{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--red);line-height:1;margin-bottom:6px;opacity:.5}
+.l-stage.l-stage-active .l-stage-num{opacity:1}
+.l-stage-icon{font-size:20px;margin-bottom:8px;display:block}
+.l-stage-name{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);line-height:1.3}
+.l-stage.l-stage-active .l-stage-name{color:var(--white)}
+.l-stage-detail{background:var(--g2);border:1px solid var(--g3);border-radius:4px;padding:28px;display:none}
+.l-stage-detail.l-stage-active{display:block}
+.l-stage-detail h4{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;margin-bottom:8px}
+.l-stage-detail p{font-size:14px;color:var(--light);line-height:1.7;max-width:680px}
+/* ── OUTCOMES ── */
+.l-outcomes-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;background:var(--g3);border-radius:6px;overflow:hidden;margin-top:56px}
+.l-outcome{background:var(--black);padding:28px;display:flex;gap:16px;transition:background .2s}
+.l-outcome:hover{background:var(--g2)}
+.l-outcome-n{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--red);min-width:28px;padding-top:2px}
+.l-outcome strong{display:block;font-size:14px;font-weight:700;margin-bottom:6px}
+.l-outcome span{font-size:12px;color:var(--muted);line-height:1.6}
+/* ── TOOLS ── */
+.l-tools-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;background:var(--g3);border-radius:6px;overflow:hidden;margin-top:56px}
+.l-tool-cat{background:var(--black);padding:28px 24px}
+.l-tool-cat-label{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--red);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--g3)}
+.l-tool-items{display:flex;flex-direction:column;gap:10px}
+.l-tool-item{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500}
+.l-tool-icon{width:26px;height:26px;background:var(--g3);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+/* ── ABOUT / CREDS ── */
+.l-about-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:var(--g3);border-radius:6px;overflow:hidden;margin-top:56px}
+.l-about-col{background:var(--black);padding:40px}
+.l-about-name{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:1px;line-height:1;margin-bottom:6px}
+.l-about-role{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:16px}
+.l-about-bio{font-size:14px;color:var(--light);line-height:1.75;margin-bottom:14px}
+.l-about-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.l-about-tag{font-size:11px;font-weight:600;padding:4px 12px;border:1px solid var(--g4);border-radius:100px;color:var(--muted)}
+.l-creds{display:flex;flex-direction:column;gap:10px}
+.l-cred{display:flex;gap:14px;padding:14px;background:var(--g2);border:1px solid var(--g3);border-left:3px solid var(--red);border-radius:0 4px 4px 0}
+.l-cred-icon{font-size:16px;flex-shrink:0;margin-top:2px}
+.l-cred strong{display:block;font-size:13px;font-weight:700;margin-bottom:2px}
+.l-cred span{font-size:12px;color:var(--muted)}
+/* ── FINAL CTA ── */
+.l-final-cta{padding:100px 48px;text-align:center;background:linear-gradient(135deg,var(--g1),var(--black))}
+.l-final-cta h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,7vw,88px);line-height:.9;letter-spacing:2px;margin-bottom:16px}
+.l-final-cta p{font-size:16px;color:var(--light);max-width:500px;margin:0 auto 36px}
+.l-cta-pair{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+/* ── FOOTER ── */
+.l-footer{padding:48px 0 28px;border-top:1px solid var(--g3)}
+.l-footer-inner{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px}
+.l-footer-brand{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px}
+.l-footer-brand em{color:var(--red);font-style:normal}
+.l-footer p{font-size:12px;color:var(--muted)}
+.l-footer a{color:var(--red);text-decoration:none}
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .l-nav{padding:0 20px}.l-nav-right .l-nav-link:not(.l-nav-cta){display:none}
+  .l-hero{padding:60px 20px}.l-container{padding:0 20px}
+  .l-course-grid{grid-template-columns:1fr}
+  .l-why-grid{grid-template-columns:1fr 1fr}
+  .l-transform-grid,.l-about-grid{grid-template-columns:1fr}
+  .l-stages{grid-template-columns:repeat(4,1fr)}
+  .l-outcomes-grid{grid-template-columns:1fr}
+  .l-tools-grid{grid-template-columns:1fr 1fr}
+  .l-paywall,.l-final-cta{padding:60px 20px}
+}
+@media(max-width:480px){
+  .l-why-grid,.l-tools-grid{grid-template-columns:1fr}
+  .l-stages{grid-template-columns:repeat(4,1fr)}
+  .lang-switcher{flex-wrap:wrap}
+}
+"""
+
+ONBOARDING_CSS = """
+.ob-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--black,#0A0A0A)}
+.ob-card{background:#1A1A1A;border:1px solid #242424;border-radius:6px;padding:44px;width:100%;max-width:520px;position:relative}
+.ob-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:#E11D2E;border-radius:3px 3px 0 0}
+.ob-brand{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:3px;color:#fff;margin-bottom:32px;display:block;text-decoration:none}
+.ob-brand em{color:#E11D2E;font-style:normal}
+.ob-steps{display:flex;align-items:center;gap:6px;margin-bottom:36px}
+.ob-step-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #333;color:#777;transition:all .2s}
+.ob-step-dot.ob-active{border-color:#E11D2E;color:#E11D2E;background:rgba(225,29,46,.1)}
+.ob-step-dot.ob-done{border-color:#E11D2E;background:#E11D2E;color:#fff}
+.ob-step-line{flex:1;height:1px;background:#333}
+.ob-heading{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:1px;color:#fff;margin-bottom:8px}
+.ob-sub{font-size:14px;color:#777;margin-bottom:28px}
+.ob-options{display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
+.ob-option{display:flex;align-items:center;gap:14px;padding:16px 18px;background:#111;border:1px solid #333;border-radius:3px;cursor:pointer;font-size:14px;font-weight:500;color:#bbb;transition:all .15s;position:relative}
+.ob-option:hover{border-color:#555;color:#fff;background:#1A1A1A}
+.ob-option input[type=radio]{position:absolute;opacity:0;width:0;height:0}
+.ob-option.ob-selected{border-color:#E11D2E;color:#fff;background:rgba(225,29,46,.08)}
+.ob-option-check{width:18px;height:18px;border-radius:50%;border:2px solid #444;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:transparent;transition:all .15s}
+.ob-option.ob-selected .ob-option-check{border-color:#E11D2E;background:#E11D2E;color:#fff}
+.ob-select{width:100%;background:#111;border:1px solid #333;border-radius:3px;color:#bbb;font-family:'DM Sans',sans-serif;font-size:14px;padding:12px 16px;transition:border-color .15s;outline:none;margin-bottom:28px;cursor:pointer}
+.ob-select:focus{border-color:#E11D2E}
+.ob-select option{background:#1A1A1A}
+.ob-form-group{margin-bottom:18px}
+.ob-label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:8px}
+.ob-input{width:100%;background:#111;border:1px solid #333;border-radius:3px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;padding:12px 16px;transition:border-color .15s;outline:none}
+.ob-input:focus{border-color:#E11D2E}
+.ob-btn{width:100%;padding:14px;background:#E11D2E;color:#fff;font-family:'DM Sans',sans-serif;font-weight:800;font-size:12px;letter-spacing:2px;text-transform:uppercase;border:none;border-radius:3px;cursor:pointer;transition:all .2s}
+.ob-btn:hover{background:#c91828;transform:translateY(-1px)}
+.ob-back{background:none;border:none;color:#555;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;padding:0;font-family:'DM Sans',sans-serif;margin-top:14px;display:block}
+.ob-back:hover{color:#bbb}
+.ob-footer{text-align:center;margin-top:20px;font-size:13px;color:#555}
+.ob-footer a{color:#E11D2E;text-decoration:none}
+.ob-alert{padding:12px 16px;background:rgba(225,29,46,.1);border:1px solid rgba(225,29,46,.3);border-radius:3px;color:#ff6b7a;font-size:13px;margin-bottom:20px}
+.ob-fine{text-align:center;font-size:12px;color:#555;margin-top:12px}
+@media(max-width:480px){.ob-card{padding:28px 20px}}
+"""
+
 JS = """
 function showTab(btn, id) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -371,14 +605,14 @@ document.addEventListener('click', function(e) {
 });
 """
 
-def _page(title, body, nav=""):
+def _page(title, body, nav="", extra_css="", lang="en"):
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{lang}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Dako Studios Bootcamp</title>
-<style>{CSS}</style>
+<style>{CSS}{extra_css}</style>
 </head>
 <body>
 {nav}
@@ -437,12 +671,312 @@ def _nav_coach(coach):
   </div>
 </nav>"""
 
+# ─── Landing page ─────────────────────────────────────────────────────────────
+
+_WEEK_TITLES = {
+    1: "Computer & File System Fundamentals",
+    2: "Internet, Email & Documents",
+    3: "Research, Cloud & Cybersecurity",
+    4: "AI Tools, Portfolio & Career",
+}
+
+_CT_STAGES = [
+    ("01", "🔍", "AI Discovery",         "Before great content comes great understanding. In this stage creators use AI as a thinking partner to research their audience, map their niche, and surface insight that would take weeks to find manually."),
+    ("02", "💡", "Strategic Ideation",   "Raw ideas mean nothing without structure. This stage transforms initial research into a defined content strategy — content pillars, audience personas, messaging frameworks, and a clear direction."),
+    ("03", "🏗️", "System Design",         "Great creators build systems, not just content. You design your personal content operating system — workflows, calendars, batch production routines, AI delegation strategies."),
+    ("04", "🎬", "Content Production",    "This is where thinking becomes making. Across video, written, visual, and audio formats, you learn the production fundamentals that allow a solo creator to produce at a studio standard."),
+    ("05", "🚀", "Launch & Distribution", "Creating great content is only half the equation. Platform strategy, algorithm logic, scheduling systems, and campaign architecture — everything to put content in front of the right people."),
+    ("06", "📊", "Performance Insight",   "Data is only valuable if you can act on it. You learn to read platform analytics, identify what is working, diagnose what is not, and build iteration cycles that compound improvement."),
+    ("07", "♾️",  "Creative Evolution",   "The final stage is about long-term growth. Build in public, map your audience journey with UX thinking, and define what creative evolution means for your specific creator path."),
+]
+
+def _landing_page(t: dict, lang: str, days: list) -> str:
+    weeks: dict[int, list] = {1: [], 2: [], 3: [], 4: []}
+    for d in days:
+        w = ((d["day"] - 1) // 5) + 1
+        if 1 <= w <= 4:
+            weeks[w].append(d)
+
+    def week_html(w: int) -> str:
+        rows = "".join(
+            f'<div class="l-day-row">'
+            f'<span class="l-day-num">DAY {d["day"]:02d}</span>'
+            f'<span class="l-day-title">{d["title"]}</span>'
+            f'<span class="l-day-badge {"l-day-free" if d["day"] <= FREE_DAYS else "l-day-locked"}">'
+            f'{t["free_badge"] if d["day"] <= FREE_DAYS else t["locked_badge"]}</span>'
+            f'</div>'
+            for d in weeks[w]
+        )
+        open_attr = " open" if w == 1 else ""
+        return (f'<details class="l-week"{open_attr}>'
+                f'<summary>'
+                f'<span class="l-week-label">{t["week"]} {w}</span>'
+                f'<span class="l-week-name">{_WEEK_TITLES[w]}</span>'
+                f'<span class="l-week-arr">▼</span>'
+                f'</summary>'
+                f'<div class="l-week-days">{rows}</div>'
+                f'</details>')
+
+    curriculum_html = "".join(week_html(w) for w in range(1, 5))
+
+    stages_cards = "".join(
+        f'<div class="l-stage{"  l-stage-active" if i == 0 else ""}" '
+        f'onclick="lStage(this,{i})">'
+        f'<div class="l-stage-num">{num}</div>'
+        f'<span class="l-stage-icon">{icon}</span>'
+        f'<div class="l-stage-name">{name}</div>'
+        f'</div>'
+        for i, (num, icon, name, _) in enumerate(_CT_STAGES)
+    )
+    stages_details = "".join(
+        f'<div class="l-stage-detail{"  l-stage-active" if i == 0 else ""}" id="lsd{i}">'
+        f'<h4>{num} — {name}</h4><p>{desc}</p>'
+        f'</div>'
+        for i, (num, _, name, desc) in enumerate(_CT_STAGES)
+    )
+    switcher = _lang_switcher(lang)
+
+    return f"""<div class="landing-page">
+<!-- NAV -->
+<nav class="l-nav">
+  <a href="/" class="l-nav-brand">DAKO<em>.</em>STUDIOS</a>
+  <div class="l-nav-right">
+    {switcher}
+    <a href="#digital-skills" class="l-nav-link">{t["nav_digital"]}</a>
+    <a href="#creative-tech" class="l-nav-link">{t["nav_creative"]}</a>
+    <a href="/login" class="l-nav-link">{t["nav_login"]}</a>
+    <a href="/onboarding" class="l-nav-link l-nav-cta">{t["ds_cta"]}</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="l-hero">
+  <div class="l-hero-bg"></div>
+  <div class="l-hero-lines"></div>
+  <div class="l-hero-content">
+    <div class="l-eyebrow"><span class="l-eyebrow-dot"></span><span class="l-eyebrow-text">{t["hero_eyebrow"]}</span></div>
+    <h1>{t["hero_headline_1"]}<br><span class="l-accent">{t["hero_headline_accent"]}</span></h1>
+    <p class="l-hero-sub">{t["hero_sub"]}</p>
+  </div>
+</section>
+
+<!-- COURSE CARDS -->
+<section class="l-courses">
+  <div class="l-container">
+    <div class="l-sec-label">Two Programmes</div>
+    <h2 class="l-sec-title">Choose Your Path</h2>
+    <div class="l-course-grid">
+      <!-- Digital Skills -->
+      <div class="l-course-card">
+        <div class="l-course-badge">{t["ds_badge"]}</div>
+        <div class="l-course-title">{t["ds_title"]}</div>
+        <p class="l-course-desc">{t["ds_desc"]}</p>
+        <div class="l-course-pills">
+          <div class="l-pill"><span class="l-pill-dot"></span>{t["ds_pill_1"]}</div>
+          <div class="l-pill"><span class="l-pill-dot"></span>{t["ds_pill_2"]}</div>
+          <div class="l-pill"><span class="l-pill-dot"></span>{t["ds_pill_3"]}</div>
+        </div>
+        <div class="l-price-row"><span class="l-price">{t["ds_price"]}</span><span class="l-price-sub">{t["ds_price_sub"]}</span></div>
+        <a href="/onboarding" class="l-cta">{t["ds_cta"]} →</a>
+      </div>
+      <!-- Creative Tech -->
+      <div class="l-course-card">
+        <div class="l-course-badge">{t["ct_badge"]}</div>
+        <div class="l-course-title">{t["ct_title"]}</div>
+        <p class="l-course-desc">{t["ct_desc"]}</p>
+        <div class="l-course-pills">
+          <div class="l-pill"><span class="l-pill-dot"></span>{t["ct_pill_1"]}</div>
+          <div class="l-pill"><span class="l-pill-dot"></span>{t["ct_pill_2"]}</div>
+          <div class="l-pill"><span class="l-pill-dot"></span>{t["ct_pill_3"]}</div>
+        </div>
+        <div class="l-price-row"><span class="l-price">{t["ct_price"]}</span><span class="l-price-sub">{t["ct_price_sub"]}</span></div>
+        <a href="/apply/creative-tech" class="l-cta">{t["ct_cta"]} →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DIGITAL SKILLS DEEP-DIVE -->
+<section class="l-section dark" id="digital-skills">
+  <div class="l-container">
+    <div class="l-sec-label">{t["ds_section_label"]}</div>
+    <h2 class="l-sec-title">{t["ds_section_title"]}</h2>
+    <p class="l-sec-desc">{t["ds_section_sub"]}</p>
+    <!-- WHY IT WORKS -->
+    <div style="margin-top:64px">
+      <div class="l-sec-label">{t["why_label"]}</div>
+      <h3 class="l-sec-title" style="font-size:clamp(28px,4vw,44px)">{t["why_title"]}</h3>
+    </div>
+    <div class="l-why-grid">
+      <div class="l-why-card"><h4>{t["why_1_title"]}</h4><p>{t["why_1_body"]}</p></div>
+      <div class="l-why-card"><h4>{t["why_2_title"]}</h4><p>{t["why_2_body"]}</p></div>
+      <div class="l-why-card"><h4>{t["why_3_title"]}</h4><p>{t["why_3_body"]}</p></div>
+      <div class="l-why-card"><h4>{t["why_4_title"]}</h4><p>{t["why_4_body"]}</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CURRICULUM -->
+<section class="l-section">
+  <div class="l-container">
+    <div class="l-sec-label">{t["curriculum_label"]}</div>
+    <h2 class="l-sec-title">{t["curriculum_title"]}</h2>
+    <div class="l-weeks">{curriculum_html}</div>
+  </div>
+</section>
+
+<!-- PAYWALL CALLOUT -->
+<div class="l-paywall">
+  <div class="l-sec-label">{t["paywall_label"]}</div>
+  <h2>{t["paywall_title"]}</h2>
+  <p>{t["paywall_sub"]}</p>
+  <a href="/onboarding" class="l-cta">{t["paywall_cta"]} →</a>
+</div>
+
+<!-- CREATIVE TECH DEEP-DIVE -->
+<section class="l-section dark" id="creative-tech">
+  <div class="l-container">
+    <div class="l-sec-label">Creative Tech Creator Bootcamp</div>
+    <h2 class="l-sec-title">After This Bootcamp,<br>You Operate Differently.</h2>
+    <div class="l-transform-grid">
+      <div class="l-transform-col">
+        <div class="l-transform-header"><span class="l-transform-tag l-tag-before">Before</span></div>
+        <ul class="l-transform-list">
+          <li class="l-muted-item"><span class="l-icon l-icon-x">✕</span>Random content creation with no structure</li>
+          <li class="l-muted-item"><span class="l-icon l-icon-x">✕</span>Posting based on guesswork and trends</li>
+          <li class="l-muted-item"><span class="l-icon l-icon-x">✕</span>No clear niche or audience direction</li>
+          <li class="l-muted-item"><span class="l-icon l-icon-x">✕</span>Treating AI as a gimmick, not a tool</li>
+          <li class="l-muted-item"><span class="l-icon l-icon-x">✕</span>No system for measuring what works</li>
+        </ul>
+      </div>
+      <div class="l-transform-col after-col">
+        <div class="l-transform-header"><span class="l-transform-tag l-tag-after">After</span></div>
+        <ul class="l-transform-list">
+          <li class="l-bright-item"><span class="l-icon l-icon-check">✓</span>A system-driven creator with repeatable workflows</li>
+          <li class="l-bright-item"><span class="l-icon l-icon-check">✓</span>An AI-powered researcher who finds insight fast</li>
+          <li class="l-bright-item"><span class="l-icon l-icon-check">✓</span>A strategic storyteller with a defined audience</li>
+          <li class="l-bright-item"><span class="l-icon l-icon-check">✓</span>A digital media producer across video, audio, design</li>
+          <li class="l-bright-item"><span class="l-icon l-icon-check">✓</span>A professional operating like a small creative studio</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FRAMEWORK -->
+<section class="l-section">
+  <div class="l-container">
+    <div style="text-align:center;margin-bottom:56px">
+      <div class="l-sec-label">The Signature Framework</div>
+      <h2 class="l-sec-title">Dakol's Creative AI System</h2>
+      <p class="l-sec-desc" style="margin:0 auto">A 7-stage methodology that structures how modern creators think, build, and evolve.</p>
+    </div>
+    <div class="l-stages" id="lStageCards">{stages_cards}</div>
+    <div id="lStageDetails">{stages_details}</div>
+  </div>
+</section>
+
+<!-- OUTCOMES -->
+<section class="l-section dark">
+  <div class="l-container">
+    <div class="l-sec-label">Your Portfolio Promise</div>
+    <h2 class="l-sec-title">What You Will Have Built by Day 15</h2>
+    <div class="l-outcomes-grid">
+      <div class="l-outcome"><div class="l-outcome-n">01</div><div><strong>Personal AI Productivity Workflow</strong><span>A working system for using ChatGPT and Claude to accelerate research, ideation, scripting, and content planning.</span></div></div>
+      <div class="l-outcome"><div class="l-outcome-n">02</div><div><strong>Content Strategy System</strong><span>Content pillars, audience persona, 4-week calendar, and a repeatable production workflow.</span></div></div>
+      <div class="l-outcome"><div class="l-outcome-n">03</div><div><strong>Creator Brand Kit</strong><span>Visual identity, brand voice, typography, colour palette, and a completed 1-page brand board.</span></div></div>
+      <div class="l-outcome"><div class="l-outcome-n">04</div><div><strong>Digital Campaign Concept</strong><span>A structured 5-day launch campaign with copy, visuals, platform strategy, and a campaign brief.</span></div></div>
+      <div class="l-outcome"><div class="l-outcome-n">05</div><div><strong>Multi-Format Content Portfolio</strong><span>A produced video, written scripts, branded graphics, and a podcast episode.</span></div></div>
+      <div class="l-outcome"><div class="l-outcome-n">06</div><div><strong>UX Product Idea</strong><span>An audience journey map and a UX-informed content experience concept developed in FigJam.</span></div></div>
+      <div class="l-outcome"><div class="l-outcome-n">07</div><div><strong>Performance Analysis Report</strong><span>A written analysis demonstrating the ability to read data, find patterns, and make strategic decisions.</span></div></div>
+      <div class="l-outcome"><div class="l-outcome-n">08</div><div><strong>Published First Piece of Content</strong><span>Day 15 is launch day. You leave having published — not just planned.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS -->
+<section class="l-section">
+  <div class="l-container">
+    <div style="text-align:center;margin-bottom:56px">
+      <div class="l-sec-label">Tools You Will Learn</div>
+      <h2 class="l-sec-title">The Professional Creator Stack</h2>
+    </div>
+    <div class="l-tools-grid">
+      <div class="l-tool-cat"><div class="l-tool-cat-label">AI &amp; Research</div><div class="l-tool-items"><div class="l-tool-item"><div class="l-tool-icon">🤖</div>ChatGPT</div><div class="l-tool-item"><div class="l-tool-icon">🧠</div>Claude</div><div class="l-tool-item"><div class="l-tool-icon">🔎</div>Perplexity</div></div></div>
+      <div class="l-tool-cat"><div class="l-tool-cat-label">Design &amp; Visual</div><div class="l-tool-items"><div class="l-tool-item"><div class="l-tool-icon">🎨</div>Canva</div><div class="l-tool-item"><div class="l-tool-icon">📐</div>Figma / FigJam</div><div class="l-tool-item"><div class="l-tool-icon">✨</div>Midjourney</div></div></div>
+      <div class="l-tool-cat"><div class="l-tool-cat-label">Media Production</div><div class="l-tool-items"><div class="l-tool-item"><div class="l-tool-icon">🎙️</div>Riverside.fm</div><div class="l-tool-item"><div class="l-tool-icon">🎬</div>CapCut</div><div class="l-tool-item"><div class="l-tool-icon">🎞️</div>DaVinci Resolve</div></div></div>
+      <div class="l-tool-cat"><div class="l-tool-cat-label">Productivity</div><div class="l-tool-items"><div class="l-tool-item"><div class="l-tool-icon">📋</div>Notion</div><div class="l-tool-item"><div class="l-tool-icon">✅</div>Asana</div><div class="l-tool-item"><div class="l-tool-icon">📅</div>Buffer / Later</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="l-section dark">
+  <div class="l-container">
+    <div class="l-sec-label">Your Facilitator</div>
+    <h2 class="l-sec-title" style="margin-bottom:48px">A Creative Technologist.<br>Not Just a Teacher.</h2>
+    <div class="l-about-grid">
+      <div class="l-about-col">
+        <div class="l-about-role">Creative Tech Facilitator · Digital Media Producer</div>
+        <div class="l-about-name">Dakol Masiyer</div>
+        <p class="l-about-bio">Multidisciplinary producer, digital strategist, and entrepreneur with experience spanning film production, defence technology, content creation, and platform development. He operates as a creative technologist — bridging media, design, and AI systems.</p>
+        <p class="l-about-bio">Each cohort is intentionally limited to ensure personalised attention. You are not one of hundreds. You are one of five.</p>
+        <div class="l-about-tags">
+          <span class="l-about-tag">AI Tools</span><span class="l-about-tag">Video Production</span><span class="l-about-tag">Content Strategy</span><span class="l-about-tag">UX Design</span><span class="l-about-tag">Podcast Production</span><span class="l-about-tag">Film Production</span>
+        </div>
+      </div>
+      <div class="l-about-col">
+        <div class="l-creds">
+          <div class="l-cred"><div class="l-cred-icon">🎬</div><div><strong>Digital Media Producer</strong><span>Native Filmworks · First Features Project · Amazon Prime content</span></div></div>
+          <div class="l-cred"><div class="l-cred-icon">🌍</div><div><strong>FIFA World Cup 2022 Volunteer</strong><span>Qatar — international production and cultural navigation</span></div></div>
+          <div class="l-cred"><div class="l-cred-icon">⚙️</div><div><strong>Defence Technology &amp; Engineering</strong><span>DICON Ordnance Factory · NDA MSc Cybersecurity</span></div></div>
+          <div class="l-cred"><div class="l-cred-icon">🚀</div><div><strong>Founder, Dakon Enterprises</strong><span>Dako Studios · DakoDash · SyncMaster Platform</span></div></div>
+          <div class="l-cred"><div class="l-cred-icon">📊</div><div><strong>4+ Years Digital Strategy</strong><span>Integrated campaigns · UX · Content systems · Metrics</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="l-final-cta">
+  <div class="l-sec-label">Ready?</div>
+  <h2>Pick Your Bootcamp.<br><span style="color:var(--red)">Start Today.</span></h2>
+  <p>Self-paced digital skills or a live creative tech cohort. Both built to get you results.</p>
+  <div class="l-cta-pair">
+    <a href="/onboarding" class="l-cta">{t["ds_cta"]} →</a>
+    <a href="/apply/creative-tech" class="l-cta l-cta-ghost">{t["ct_cta"]} →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="l-footer">
+  <div class="l-container"><div class="l-footer-inner">
+    <div class="l-footer-brand">DAKO<em>.</em>STUDIOS</div>
+    <p>{t["footer_copy"]}</p>
+    <p>{t["footer_contact"]} · <a href="mailto:masiyerdakol@gmail.com">masiyerdakol@gmail.com</a></p>
+  </div></div>
+</footer>
+
+</div>
+<script>
+function lStage(el,idx){{
+  document.querySelectorAll('.l-stage').forEach(s=>s.classList.remove('l-stage-active'));
+  document.querySelectorAll('.l-stage-detail').forEach(d=>d.classList.remove('l-stage-active'));
+  el.classList.add('l-stage-active');
+  document.getElementById('lsd'+idx).classList.add('l-stage-active');
+}}
+</script>"""
+
 # ─── Public: Auth ─────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     if _get_student(request): return RedirectResponse("/student", 302)
-    return HTMLResponse(_page("Welcome", _login_page()))
+    lang = _get_lang(request)
+    days = query("SELECT day, title FROM curriculum ORDER BY day")
+    return HTMLResponse(_page("Welcome", _landing_page(get_t(lang), lang, days),
+                              extra_css=LANDING_CSS + ONBOARDING_CSS, lang=lang))
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page():
@@ -450,7 +984,7 @@ async def login_page():
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page():
-    return HTMLResponse(_page("Register", _login_page(tab="register")))
+    return RedirectResponse("/onboarding", 302)
 
 def _login_page(error="", tab="login"):
     err = f'<div class="alert alert-error">{error}</div>' if error else ""
@@ -513,6 +1047,274 @@ async def logout():
     resp = RedirectResponse("/", 302)
     resp.delete_cookie("s_token")
     return resp
+
+# ─── Language ─────────────────────────────────────────────────────────────────
+
+@app.post("/set-language")
+async def set_language(request: Request, lang: str = Form(...)):
+    if lang not in VALID_LANGS:
+        lang = "en"
+    resp = RedirectResponse(request.headers.get("referer", "/"), 302)
+    resp.set_cookie("lang_pref", lang, httponly=False, max_age=86400 * 365,
+                    samesite="lax", secure=True)
+    return resp
+
+# ─── Onboarding ───────────────────────────────────────────────────────────────
+
+def _ob_progress(step: int) -> str:
+    dots = ""
+    for i in range(1, 4):
+        cls = "ob-active" if i == step else ("ob-done" if i < step else "")
+        check = "✓" if i < step else str(i)
+        dots += f'<div class="ob-step-dot {cls}">{check}</div>'
+        if i < 3:
+            dots += '<div class="ob-step-line"></div>'
+    return f'<div class="ob-steps">{dots}</div>'
+
+def _ob_step1_page(t: dict, lang: str) -> str:
+    opts = [
+        ("beginner",   t["ob_opt_beginner"]),
+        ("some_exp",   t["ob_opt_some"]),
+        ("confident",  t["ob_opt_confident"]),
+    ]
+    options_html = "".join(
+        f'<label class="ob-option" onclick="obSelect(this)">'
+        f'<input type="radio" name="skill" value="{val}" required>'
+        f'<div class="ob-option-check">✓</div>{label}</label>'
+        for val, label in opts
+    )
+    switcher = _lang_switcher(lang)
+    return f"""<div class="ob-wrap">
+  <div class="ob-card">
+    <a href="/" class="ob-brand">DAKO<em>.</em>STUDIOS</a>
+    {_ob_progress(1)}
+    <h2 class="ob-heading">{t["ob_step1_heading"]}</h2>
+    <p class="ob-sub">{t["ob_step1_sub"]}</p>
+    <form method="POST" action="/onboarding/1">
+      <div class="ob-options">{options_html}</div>
+      <button type="submit" class="ob-btn">{t["ob_next"]} →</button>
+    </form>
+    <div class="ob-footer" style="margin-top:16px">{switcher}</div>
+    <div class="ob-footer">{t["ob_already"]} <a href="/login">{t["ob_login"]}</a></div>
+  </div>
+</div>
+<script>
+function obSelect(el){{
+  document.querySelectorAll('.ob-option').forEach(o=>o.classList.remove('ob-selected'));
+  el.classList.add('ob-selected');
+  el.querySelector('input').checked=true;
+}}
+</script>"""
+
+def _ob_step2_page(t: dict, lang: str) -> str:
+    countries = [
+        "Nigeria", "Ghana", "Kenya", "South Africa", "Uganda", "Tanzania",
+        "Ethiopia", "Rwanda", "Zambia", "Zimbabwe", "Senegal", "Côte d'Ivoire",
+        "Cameroon", "Angola", "Mozambique", "Botswana",
+        "Another African country", "Outside Africa",
+    ]
+    opts_html = "".join(f'<option value="{c}">{c}</option>' for c in countries)
+    return f"""<div class="ob-wrap">
+  <div class="ob-card">
+    <a href="/" class="ob-brand">DAKO<em>.</em>STUDIOS</a>
+    {_ob_progress(2)}
+    <h2 class="ob-heading">{t["ob_step2_heading"]}</h2>
+    <p class="ob-sub">{t["ob_step2_sub"]}</p>
+    <form method="POST" action="/onboarding/2">
+      <select name="country" class="ob-select" required>
+        <option value="" disabled selected>Select your country</option>
+        {opts_html}
+      </select>
+      <button type="submit" class="ob-btn">{t["ob_next"]} →</button>
+      <a href="/onboarding" class="ob-back">← {t["ob_back"]}</a>
+    </form>
+    <div class="ob-footer">{t["ob_already"]} <a href="/login">{t["ob_login"]}</a></div>
+  </div>
+</div>"""
+
+def _ob_step3_page(t: dict, lang: str, error: str = "") -> str:
+    err_html = f'<div class="ob-alert">{error}</div>' if error else ""
+    return f"""<div class="ob-wrap">
+  <div class="ob-card">
+    <a href="/" class="ob-brand">DAKO<em>.</em>STUDIOS</a>
+    {_ob_progress(3)}
+    <h2 class="ob-heading">{t["ob_step3_heading"]}</h2>
+    <p class="ob-sub">{t["ob_step3_sub"]}</p>
+    {err_html}
+    <form method="POST" action="/onboarding/3">
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ob_name_label"]}</label>
+        <input type="text" name="name" class="ob-input" placeholder="Your full name" required>
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ob_email_label"]}</label>
+        <input type="email" name="email" class="ob-input" placeholder="your@email.com" required>
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ob_pwd_label"]}</label>
+        <input type="password" name="password" class="ob-input" placeholder="Min 6 characters" required minlength="6">
+      </div>
+      <input type="hidden" name="preferred_lang" value="{lang}">
+      <button type="submit" class="ob-btn">{t["ob_submit"]}</button>
+    </form>
+    <p class="ob-fine">{t["ob_days_free"]} · {t["ob_full_access"]}</p>
+    <div class="ob-footer">{t["ob_already"]} <a href="/login">{t["ob_login"]}</a></div>
+  </div>
+</div>"""
+
+@app.get("/onboarding", response_class=HTMLResponse)
+async def onboarding_step1(request: Request):
+    if _get_student(request): return RedirectResponse("/student", 302)
+    lang = _get_lang(request)
+    t = get_t(lang)
+    return HTMLResponse(_page("Get Started", _ob_step1_page(t, lang),
+                              extra_css=LANDING_CSS + ONBOARDING_CSS, lang=lang))
+
+@app.post("/onboarding/1")
+async def onboarding_post1(request: Request, skill: str = Form(...)):
+    valid = {"beginner", "some_exp", "confident"}
+    if skill not in valid:
+        skill = "beginner"
+    resp = RedirectResponse("/onboarding/2", 302)
+    resp.set_cookie("ob_skill", skill, httponly=False, max_age=3600, samesite="lax", secure=True)
+    return resp
+
+@app.get("/onboarding/2", response_class=HTMLResponse)
+async def onboarding_step2(request: Request):
+    if not request.cookies.get("ob_skill"):
+        return RedirectResponse("/onboarding", 302)
+    lang = _get_lang(request)
+    t = get_t(lang)
+    return HTMLResponse(_page("Where Are You Based?", _ob_step2_page(t, lang),
+                              extra_css=LANDING_CSS + ONBOARDING_CSS, lang=lang))
+
+@app.post("/onboarding/2")
+async def onboarding_post2(request: Request, country: str = Form(...)):
+    resp = RedirectResponse("/onboarding/3", 302)
+    resp.set_cookie("ob_country", country[:100], httponly=False, max_age=3600,
+                    samesite="lax", secure=True)
+    return resp
+
+@app.get("/onboarding/3", response_class=HTMLResponse)
+async def onboarding_step3(request: Request):
+    if not request.cookies.get("ob_skill") or not request.cookies.get("ob_country"):
+        return RedirectResponse("/onboarding", 302)
+    lang = _get_lang(request)
+    t = get_t(lang)
+    return HTMLResponse(_page("Create Account", _ob_step3_page(t, lang),
+                              extra_css=LANDING_CSS + ONBOARDING_CSS, lang=lang))
+
+@app.post("/onboarding/3")
+async def onboarding_post3(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    preferred_lang: str = Form("en"),
+):
+    ob_skill   = request.cookies.get("ob_skill", "")
+    ob_country = request.cookies.get("ob_country", "")
+    lang       = _get_lang(request)
+    t          = get_t(lang)
+    if not ob_skill or not ob_country:
+        return RedirectResponse("/onboarding", 302)
+    if one("SELECT id FROM students WHERE email=?", (email.strip(),)):
+        return HTMLResponse(_page("Create Account",
+                                  _ob_step3_page(t, lang, error=t["ob_error_email"]),
+                                  extra_css=LANDING_CSS + ONBOARDING_CSS, lang=lang))
+    if preferred_lang not in VALID_LANGS:
+        preferred_lang = "en"
+    sid = run(
+        "INSERT INTO students (name,email,password_hash,current_day,paid_access,"
+        "skill_level,country,preferred_lang) VALUES (?,?,?,1,0,?,?,?)",
+        (name.strip(), email.strip(), _hash(password), ob_skill, ob_country, preferred_lang),
+    )
+    tok = _token()
+    run("INSERT INTO sessions (token, student_id) VALUES (?,?)", (tok, sid))
+    resp = RedirectResponse("/student/day/1", 302)
+    resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
+    resp.delete_cookie("ob_skill")
+    resp.delete_cookie("ob_country")
+    return resp
+
+# ─── Creative Tech Apply ──────────────────────────────────────────────────────
+
+def _ct_apply_page(t: dict, lang: str, success: bool = False, error: str = "") -> str:
+    if success:
+        body = f"""<div class="ob-wrap">
+  <div class="ob-card" style="text-align:center">
+    <div style="font-size:48px;margin-bottom:16px">✓</div>
+    <h2 class="ob-heading" style="color:#E11D2E">{t.get("ct_apply_success","Application received.")}</h2>
+    <p style="color:#bbb;margin-top:12px;font-size:14px">Dakol will be in touch within 48 hours.</p>
+    <a href="/" class="ob-btn" style="display:block;margin-top:28px;text-decoration:none">← Back to Home</a>
+  </div>
+</div>"""
+        return body
+    err_html = f'<div class="ob-alert">{error}</div>' if error else ""
+    countries_html = "".join(
+        f'<option value="{c}">{c}</option>'
+        for c in ["Nigeria","Ghana","Kenya","South Africa","Uganda","Tanzania",
+                  "Ethiopia","Rwanda","Another African country","Outside Africa"]
+    )
+    return f"""<div class="ob-wrap" style="align-items:flex-start;padding-top:80px">
+  <div class="ob-card" style="max-width:600px">
+    <a href="/" class="ob-brand">DAKO<em>.</em>STUDIOS</a>
+    <h2 class="ob-heading">{t["ct_apply_heading"]}</h2>
+    <p class="ob-sub">{t["ct_apply_sub"]}</p>
+    {err_html}
+    <form method="POST" action="/apply/creative-tech">
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ct_apply_name"]}</label>
+        <input type="text" name="name" class="ob-input" required>
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ct_apply_email"]}</label>
+        <input type="email" name="email" class="ob-input" required>
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ct_apply_country"]}</label>
+        <select name="country" class="ob-select" required>
+          <option value="" disabled selected>Select</option>
+          {countries_html}
+        </select>
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ct_apply_background"]}</label>
+        <textarea name="background" class="ob-input" style="min-height:90px;resize:vertical"
+          placeholder="{t["ct_apply_background_ph"]}" required></textarea>
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-label">{t["ct_apply_motivation"]}</label>
+        <textarea name="motivation" class="ob-input" style="min-height:90px;resize:vertical"
+          placeholder="{t["ct_apply_motivation_ph"]}" required></textarea>
+      </div>
+      <button type="submit" class="ob-btn">{t["ct_apply_submit"]}</button>
+    </form>
+  </div>
+</div>"""
+
+@app.get("/apply/creative-tech", response_class=HTMLResponse)
+async def ct_apply_get(request: Request):
+    lang = _get_lang(request)
+    t = get_t(lang)
+    success = request.query_params.get("success") == "1"
+    return HTMLResponse(_page("Apply — Creative Tech Bootcamp",
+                              _ct_apply_page(t, lang, success=success),
+                              extra_css=LANDING_CSS + ONBOARDING_CSS, lang=lang))
+
+@app.post("/apply/creative-tech")
+async def ct_apply_post(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    country: str = Form(...),
+    background: str = Form(...),
+    motivation: str = Form(...),
+):
+    run("INSERT INTO creative_tech_applications (name,email,country,background,motivation)"
+        " VALUES (?,?,?,?,?)",
+        (name.strip(), email.strip(), country, background.strip(), motivation.strip()))
+    return RedirectResponse("/apply/creative-tech?success=1", 302)
 
 # ─── Public: Pricing ──────────────────────────────────────────────────────────
 
@@ -2030,5 +2832,42 @@ async def regenerate_ai_feedback(grading_result_id: int, request: Request):
         raise e
     finally:
         db.return_connection(conn)
-        
+
     return RedirectResponse(request.headers.get("referer", "/coach/dashboard"), 302)
+
+
+@app.get("/coach/applications", response_class=HTMLResponse)
+async def coach_applications(request: Request):
+    coach = _get_coach(request)
+    if not coach:
+        return RedirectResponse("/coach", 302)
+    apps = query(
+        "SELECT id, name, email, country, background, motivation, created_at "
+        "FROM creative_tech_applications ORDER BY created_at DESC"
+    )
+    rows = "".join(
+        f'<tr>'
+        f'<td>{a["name"]}</td>'
+        f'<td><a href="mailto:{a["email"]}">{a["email"]}</a></td>'
+        f'<td>{a["country"]}</td>'
+        f'<td style="max-width:240px;white-space:normal">{a["background"][:120]}{"…" if len(a["background"])>120 else ""}</td>'
+        f'<td style="max-width:240px;white-space:normal">{a["motivation"][:120]}{"…" if len(a["motivation"])>120 else ""}</td>'
+        f'<td style="white-space:nowrap">{a["created_at"][:10]}</td>'
+        f'</tr>'
+        for a in apps
+    )
+    body = f"""
+<h2>Creative Tech Applications ({len(apps)})</h2>
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+  <thead><tr style="background:#1a1a1a;text-align:left">
+    <th style="padding:10px 8px">Name</th>
+    <th style="padding:10px 8px">Email</th>
+    <th style="padding:10px 8px">Country</th>
+    <th style="padding:10px 8px">Background</th>
+    <th style="padding:10px 8px">Motivation</th>
+    <th style="padding:10px 8px">Date</th>
+  </tr></thead>
+  <tbody>{rows if rows else '<tr><td colspan="6" style="padding:16px;color:#888">No applications yet.</td></tr>'}</tbody>
+</table>"""
+    nav = f'<a href="/coach/dashboard">← Dashboard</a>'
+    return HTMLResponse(_page("Applications", body, nav=nav))

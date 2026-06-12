@@ -235,14 +235,27 @@ def init_db():
     PRAGMA foreign_keys=ON;
 
     CREATE TABLE IF NOT EXISTS students (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        name          TEXT    NOT NULL,
-        email         TEXT    UNIQUE NOT NULL,
-        password_hash TEXT    NOT NULL,
-        current_day   INTEGER NOT NULL DEFAULT 1,
-        paid_access   INTEGER NOT NULL DEFAULT 0,
-        cohort_id     INTEGER REFERENCES cohorts(id),
-        created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        name           TEXT    NOT NULL,
+        email          TEXT    UNIQUE NOT NULL,
+        password_hash  TEXT    NOT NULL,
+        current_day    INTEGER NOT NULL DEFAULT 1,
+        paid_access    INTEGER NOT NULL DEFAULT 0,
+        cohort_id      INTEGER REFERENCES cohorts(id),
+        skill_level    TEXT    DEFAULT NULL,
+        country        TEXT    DEFAULT NULL,
+        preferred_lang TEXT    NOT NULL DEFAULT 'en',
+        created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS creative_tech_applications (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL,
+        email      TEXT NOT NULL,
+        background TEXT NOT NULL,
+        motivation TEXT NOT NULL,
+        country    TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS sessions (

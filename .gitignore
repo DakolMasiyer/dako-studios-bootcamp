@@ -13,3 +13,5 @@ memory/
 Module_*.docx
 notebooklm_knowledge_bank.md
 bootcamp_audit_report.md
+.vercel
+.env*
