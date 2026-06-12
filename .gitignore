@@ -15,3 +15,5 @@ notebooklm_knowledge_bank.md
 bootcamp_audit_report.md
 .vercel
 .env*
+graph_store.json
+graphify-out/
