@@ -1264,7 +1264,7 @@ async def onboarding_post3(
     )
     tok = _token()
     run("INSERT INTO sessions (token, student_id) VALUES (?,?)", (tok, sid))
-    resp = RedirectResponse("/student/day/1", 302)
+    resp = RedirectResponse("/student?welcome=1", 302)
     resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
     resp.delete_cookie("ob_skill")
     resp.delete_cookie("ob_country")
@@ -1491,7 +1491,7 @@ async def payment_checkout(request: Request):
 
 
 @app.get("/payment/return")
-async def payment_return(request: Request, tx_ref: str = "", status: str = ""):
+async def payment_return(request: Request, tx_ref: str = "", status: str = "", transaction_id: str = ""):
     student = _get_student(request)
     if not student:
         return RedirectResponse("/", 302)
@@ -1499,22 +1499,49 @@ async def payment_return(request: Request, tx_ref: str = "", status: str = ""):
     if status == "cancelled" or status == "failed" or not tx_ref:
         return RedirectResponse("/pricing?payment=cancelled", 302)
 
-    # In Phase 2, the frontend redirect is NOT authoritative.
-    # The webhook updates the database. We just check the current status here.
-    # Wait briefly just in case the webhook is still processing
-    import asyncio
-    await asyncio.sleep(1.0)
-    
-    payment = one("SELECT status, verification_status FROM payments WHERE tx_ref=?", (tx_ref,))
+    # Check DB first — webhook may have already processed it
+    payment = one("SELECT * FROM payments WHERE tx_ref=?", (tx_ref,))
     if payment and payment["status"] == "success":
         return RedirectResponse("/student?payment=success", 302)
-    elif payment and payment["status"] == "failed":
+    if payment and payment["status"] == "failed":
         return RedirectResponse("/pricing?payment=failed", 302)
-    else:
-        # Still pending, tell the user we are processing
-        return HTMLResponse(_page("Payment Processing",
-            '<div class="container"><div class="alert alert-info">We are verifying your payment. It might take a moment. '
-            '<a href="/student">Go to dashboard</a>.</div></div>'))
+
+    # Webhook hasn't fired yet — verify directly via Flutterwave API right now
+    if payment and status == "completed":
+        try:
+            verified, result = await _verify_flutterwave_transaction(
+                tx_ref, float(payment["amount"]), payment["currency"],
+                transaction_id=transaction_id,
+            )
+            if verified:
+                now = datetime.utcnow().isoformat()[:19]
+                run("UPDATE payments SET status='success', verification_status='verified', verified_at=?, flw_ref=?, updated_at=? WHERE id=?",
+                    (now, transaction_id, now, payment["id"]))
+                run("UPDATE students SET paid_access=1 WHERE id=?", (payment["student_id"],))
+                log_payment_event("payment_verified", tx_ref, payment["student_id"], payment["amount"],
+                                  flw_ref=transaction_id, status="success")
+                return RedirectResponse("/student?payment=success", 302)
+        except Exception:
+            pass  # fall through to holding page
+
+    # Fallback holding page — shown only if verification is still pending
+    holding_body = f"""
+<div class="container" style="max-width:520px;padding-top:80px;text-align:center">
+  <div class="card" style="padding:48px 36px">
+    <div style="font-size:3rem;margin-bottom:16px;animation:spin 1.5s linear infinite;display:inline-block">⏳</div>
+    <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:8px">Confirming your payment…</h2>
+    <p class="text-muted" style="margin-bottom:24px">We're verifying with Flutterwave. This usually takes a few seconds.</p>
+    <p style="font-size:.78rem;color:#9ca3af;margin-bottom:28px">Ref: {tx_ref}</p>
+    <a href="/student" class="btn btn-red btn-lg" style="display:inline-block;min-width:200px">Go to Dashboard</a>
+    <p class="text-muted text-sm mt-3">Redirecting automatically in <span id="cd">8</span>s…</p>
+  </div>
+</div>
+<style>@keyframes spin{{to{{transform:rotate(360deg)}}}}</style>
+<script>
+  var s=8,el=document.getElementById('cd');
+  var t=setInterval(function(){{s--;el.textContent=s;if(s<=0){{clearInterval(t);window.location='/student';}}}},1000);
+</script>"""
+    return HTMLResponse(_page("Payment Processing", holding_body))
 
 @app.post("/payment/webhook")
 async def payment_webhook(request: Request):
@@ -1753,9 +1780,16 @@ async def student_dashboard(request: Request):
     student = dict(student)
 
     flash = request.query_params.get("payment", "")
+    welcome = request.query_params.get("welcome", "")
     flash_html = ""
     if flash == "success":
-        flash_html = '<div class="alert alert-success">Payment confirmed! All 20 days are now unlocked.</div>'
+        flash_html = '''<div style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;gap:16px">
+  <span style="font-size:2rem">✅</span>
+  <div>
+    <div style="font-weight:800;font-size:1.05rem;color:#065f46">Payment confirmed!</div>
+    <div style="color:#047857;font-size:.9rem;margin-top:2px">All 20 days are now unlocked. <a href="/student/day/4" style="color:#065f46;font-weight:700">Start Day 4 →</a></div>
+  </div>
+</div>'''
 
     subs = query(
         "SELECT assessment_id AS day, grading_status AS status FROM submissions WHERE student_id=? AND submission_status != 'draft'",
@@ -1793,7 +1827,43 @@ async def student_dashboard(request: Request):
     if not student["paid_access"]:
         upgrade_bar = f'<div class="alert alert-warn flex items-center justify-between"><span>You\'re on the free trial — Days 1–{FREE_DAYS} only. Unlock all 20 days to continue.</span><a href="/pricing" class="btn btn-gold btn-sm" style="margin-left:16px;padding:6px 14px;font-size:.8rem">Unlock Now</a></div>'
 
-    body = f"""<div class="container">
+    welcome_overlay = ""
+    if welcome == "1":
+        first_name = student['name'].split()[0]
+        welcome_overlay = f"""
+<div id="welcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">
+  <div class="card" style="max-width:480px;width:100%;padding:40px 36px;position:relative;text-align:center">
+    <button onclick="document.getElementById('welcome-overlay').style.display='none'"
+      style="position:absolute;top:14px;right:18px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#9ca3af">✕</button>
+    <div style="font-size:2.5rem;margin-bottom:12px">🎉</div>
+    <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:4px">Welcome, {first_name}!</h2>
+    <p class="text-muted" style="margin-bottom:28px;font-size:.95rem">Here's how your next 20 days work</p>
+    <div style="text-align:left;display:flex;flex-direction:column;gap:16px;margin-bottom:32px">
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <span style="font-size:1.5rem;line-height:1">📚</span>
+        <div><strong>Days 1–{FREE_DAYS} are FREE</strong><br><span class="text-muted text-sm">Dive straight in — no payment needed to start</span></div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <span style="font-size:1.5rem;line-height:1">🔓</span>
+        <div><strong>Days {FREE_DAYS+1}–20 unlock with one payment</strong><br><span class="text-muted text-sm">Pay once, access forever — all methods accepted</span></div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <span style="font-size:1.5rem;line-height:1">✍️</span>
+        <div><strong>Daily Missions</strong><br><span class="text-muted text-sm">Submit your work and get personal coach feedback</span></div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <span style="font-size:1.5rem;line-height:1">🏆</span>
+        <div><strong>Certificate on completion</strong><br><span class="text-muted text-sm">Complete all 20 days to earn your digital certificate</span></div>
+      </div>
+    </div>
+    <a href="/student/day/1" onclick="document.getElementById('welcome-overlay').style.display='none'"
+       class="btn btn-red btn-lg btn-full">Start Day 1 — Let's Go! →</a>
+  </div>
+</div>"""
+
+    body = f"""
+{welcome_overlay}
+<div class="container">
   {flash_html}{upgrade_bar}
   <div class="card card-sm">
     <div class="flex items-center justify-between" style="margin-bottom:10px">
