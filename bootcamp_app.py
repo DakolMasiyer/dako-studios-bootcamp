@@ -2371,13 +2371,13 @@ async def coach_dashboard(request: Request):
 @app.get("/coach/grade/{sub_id}/ai-suggest")
 async def coach_ai_suggest(sub_id: int, request: Request):
     from fastapi.responses import JSONResponse
+    from ai_feedback_engine import call_gemini_text, _api_key_sequence
     coach = _get_coach(request)
     if not coach:
         return JSONResponse({"error": "Not authorised"}, status_code=401)
 
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return JSONResponse({"error": "AI feedback not configured — add GOOGLE_API_KEY to Vercel env vars."})
+    if not _api_key_sequence():
+        return JSONResponse({"error": "No Gemini API keys configured in Vercel env vars."})
 
     sub = one("""SELECT su.*, a.answer_text, c.title as day_title, st.name as student_name
                  FROM submissions su
@@ -2398,21 +2398,8 @@ async def coach_ai_suggest(sub_id: int, request: Request):
     )
 
     try:
-        import httpx as _httpx
-        model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        resp = _httpx.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-            json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                  "generationConfig": {"temperature": 0.4, "maxOutputTokens": 256}},
-            timeout=20,
-        )
-        resp.raise_for_status()
-        text = ""
-        for cand in resp.json().get("candidates", []):
-            for part in (cand.get("content") or {}).get("parts", []):
-                text += part.get("text", "")
-        return JSONResponse({"feedback": text.strip()})
+        text = call_gemini_text(prompt, max_tokens=256)
+        return JSONResponse({"feedback": text})
     except Exception as exc:
         return JSONResponse({"error": f"AI generation failed: {exc}"})
 

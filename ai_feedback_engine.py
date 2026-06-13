@@ -14,10 +14,85 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model
 DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 HTTP_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "30"))
 
+# Free keys tried in order first; paid key used only when all free keys are exhausted.
+_FREE_KEY_NAMES = [
+    "GEMINI_API_KEY",
+    "GEMINI_API_KEY_2",
+    "GEMINI_API_KEY_3",
+    "GEMINI_API_KEY_4",
+    "GEMINI_API_KEY_5",
+    "GEMINI_API_KEY_6",
+]
+_PAID_KEY_NAME = "GEMINI_PAID_API_KEY"
 
-def _get_gemini_api_key():
-    # Google docs recommend GOOGLE_API_KEY taking precedence when both are set.
-    return os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+def _api_key_sequence() -> list[str]:
+    """Return all configured Gemini keys: free-tier first, paid last."""
+    keys = [os.getenv(k) for k in _FREE_KEY_NAMES if os.getenv(k)]
+    paid = os.getenv(_PAID_KEY_NAME)
+    if paid:
+        keys.append(paid)
+    return keys
+
+
+def _is_rate_limited(exc: httpx.HTTPStatusError) -> bool:
+    if exc.response.status_code == 429:
+        return True
+    if exc.response.status_code == 503:
+        body = exc.response.text or ""
+        return "RESOURCE_EXHAUSTED" in body or "quota" in body.lower()
+    return False
+
+
+def _call_gemini_once(prompt: str, api_key: str, max_tokens: int = 512, json_mode: bool = True) -> str:
+    gen_config: dict = {"temperature": 0.2 if json_mode else 0.4, "maxOutputTokens": max_tokens}
+    if json_mode:
+        gen_config["responseMimeType"] = "application/json"
+    resp = httpx.post(
+        GEMINI_API_URL.format(model=DEFAULT_GEMINI_MODEL),
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        json={"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": gen_config},
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    resp.raise_for_status()
+    for cand in resp.json().get("candidates") or []:
+        parts = (cand.get("content") or {}).get("parts") or []
+        text = "".join(p.get("text", "") for p in parts if isinstance(p, dict)).strip()
+        if text:
+            return text
+    raise RuntimeError("Gemini returned no usable content")
+
+
+def _gemini_with_rotation(prompt: str, max_tokens: int = 512, json_mode: bool = True) -> str:
+    """Try each key in order (free → paid), rotating on rate-limit/quota errors."""
+    keys = _api_key_sequence()
+    if not keys:
+        raise RuntimeError("No Gemini API keys configured")
+    paid_key = os.getenv(_PAID_KEY_NAME)
+    last_error: Exception | None = None
+    for i, key in enumerate(keys):
+        is_paid = key == paid_key
+        label = f"key[{i + 1}]/{'paid' if is_paid else 'free'}"
+        try:
+            text = _call_gemini_once(prompt, key, max_tokens=max_tokens, json_mode=json_mode)
+            if is_paid:
+                logger.info("[GEMINI_KEY_ROTATION] succeeded on paid key after %d free key(s) exhausted", i)
+            return text
+        except httpx.HTTPStatusError as exc:
+            if _is_rate_limited(exc):
+                logger.warning(
+                    "[GEMINI_KEY_ROTATION] %s rate-limited (HTTP %s) — trying next key",
+                    label, exc.response.status_code,
+                )
+                last_error = exc
+                continue
+            raise
+    raise RuntimeError(f"All {len(keys)} Gemini key(s) exhausted. Last error: {last_error}")
+
+
+def call_gemini_text(prompt: str, max_tokens: int = 256) -> str:
+    """Plain-text Gemini call with key rotation. Used by the coach AI-suggest endpoint."""
+    return _gemini_with_rotation(prompt, max_tokens=max_tokens, json_mode=False)
 
 
 def _is_local_dev() -> bool:
@@ -68,48 +143,7 @@ def _build_prompt(grading_result_row) -> str:
 
 
 def _generate_with_gemini(prompt: str) -> dict:
-    api_key = _get_gemini_api_key()
-    if not api_key:
-        raise RuntimeError("Gemini API key not configured")
-
-    endpoint = GEMINI_API_URL.format(model=DEFAULT_GEMINI_MODEL)
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": prompt}],
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.2,
-            "maxOutputTokens": 512,
-            "responseMimeType": "application/json",
-        },
-    }
-
-    response = httpx.post(
-        endpoint,
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-        },
-        json=payload,
-        timeout=HTTP_TIMEOUT_SECONDS,
-    )
-    response.raise_for_status()
-
-    response_json = response.json()
-    candidates = response_json.get("candidates") or []
-    for candidate in candidates:
-        content = candidate.get("content") or {}
-        parts = content.get("parts") or []
-        response_text = "".join(
-            part.get("text", "") for part in parts if isinstance(part, dict)
-        ).strip()
-        if response_text:
-            return _extract_json_text(response_text)
-
-    raise RuntimeError("Gemini returned no usable content")
+    return _extract_json_text(_gemini_with_rotation(prompt, max_tokens=512, json_mode=True))
 
 
 def _mock_feedback():
