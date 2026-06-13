@@ -7,7 +7,7 @@ logger = logging.getLogger("email_service")
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("EMAIL_FROM", "Dako Studios Bootcamp <noreply@dako.studio>")
-COACH_EMAIL = os.getenv("COACH_EMAIL", "masiyerdakol@gmail.com")
+COACH_EMAIL = os.getenv("COACH_EMAIL", "coach@dako.studio")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 _STYLE = """
