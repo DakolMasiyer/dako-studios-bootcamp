@@ -1843,14 +1843,31 @@ async def student_day(day_num: int, request: Request):
         badge_cls = {"approved":"badge-approved","revision_requested":"badge-revision"}.get(st,"badge-pending")
         label = {"approved":"Passed","revision_requested":"Needs Revision","pending":"Pending Review"}.get(st, st.capitalize())
         shots = f'<a href="/uploads/{s["screenshot_url"]}" target="_blank"><img class="img-thumb" src="/uploads/{s["screenshot_url"]}" alt="Screenshot"></a>' if s["screenshot_url"] else ""
-        fb = f'<div class="mt-2 text-sm"><strong>Coach feedback:</strong> {s["feedback_summary"]}</div>' if s["feedback_summary"] else ""
+        coach_fb = f'<div class="mt-2 text-sm" style="background:#f0f9ff;border-left:3px solid #0ea5e9;padding:10px;border-radius:0 6px 6px 0"><strong>Coach feedback:</strong> {s["feedback_summary"]}</div>' if s["feedback_summary"] else ""
+
+        ai_row = one("""SELECT af.generated_feedback, af.strengths_summary, af.weaknesses_summary, af.improvement_suggestions
+            FROM ai_feedback af
+            JOIN grading_results gr ON gr.id = af.grading_result_id
+            WHERE gr.submission_id=? AND af.feedback_status='visible'
+            ORDER BY af.generated_at DESC LIMIT 1""", (s["id"],))
+        if ai_row and ai_row["generated_feedback"]:
+            strengths = f'<div><span style="color:#16a34a;font-weight:600">Strengths:</span> {ai_row["strengths_summary"]}</div>' if ai_row["strengths_summary"] else ""
+            improve = f'<div style="margin-top:4px"><span style="color:#d97706;font-weight:600">To improve:</span> {ai_row["improvement_suggestions"]}</div>' if ai_row["improvement_suggestions"] else ""
+            ai_fb = f'''<div class="mt-2" style="background:#faf5ff;border-left:3px solid #9333ea;padding:10px;border-radius:0 6px 6px 0;font-size:.85rem">
+  <div style="font-weight:700;color:#7e22ce;margin-bottom:6px">✨ AI Feedback</div>
+  <div>{ai_row["generated_feedback"]}</div>
+  {strengths}{improve}
+</div>'''
+        else:
+            ai_fb = ""
+
         subs_html += f"""<div class="sub-card {st}">
   <div class="flex items-center justify-between" style="margin-bottom:8px">
     <span class="badge {badge_cls}">{label}</span>
     <span class="text-xs text-muted">{str(s['submitted_at'])[:16]}</span>
   </div>
   <div class="text-sm" style="white-space:pre-wrap;margin-bottom:8px">{s['answer_text']}</div>
-  {f'<div class="flex gap-2">{shots}</div>' if shots else ""}{fb}
+  {f'<div class="flex gap-2">{shots}</div>' if shots else ""}{coach_fb}{ai_fb}
 </div>"""
 
     latest_status = dict(subs[0])["grading_status"] if subs else None
