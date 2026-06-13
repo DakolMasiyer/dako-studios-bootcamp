@@ -1429,6 +1429,8 @@ async def payment_checkout(request: Request):
             log_payment_event("payment_initiated", tx_ref, student["id"], price)
             log_payment_event("payment_verified", tx_ref, student["id"], price, flw_ref="dev-bypass", status="success")
             log_payment_event("enrollment_activated", tx_ref, student["id"], price, flw_ref="dev-bypass")
+            from email_service import send_payment_confirmed
+            send_payment_confirmed(student["name"], student["email"])
             return RedirectResponse("/student?payment=success", 302)
 
         return HTMLResponse(_page("Payment",
@@ -1864,14 +1866,23 @@ async def student_dashboard(request: Request):
   </div>
 </div>"""
 
+    completion_banner = ""
+    if student["current_day"] > 20:
+        completion_banner = f'''<div style="background:linear-gradient(135deg,#1a1a1a 0%,#2d1a0e 100%);border:1.5px solid #f59e0b;border-radius:14px;padding:28px 28px;margin-bottom:20px;text-align:center">
+  <div style="font-size:3rem;margin-bottom:8px">🏆</div>
+  <div style="font-weight:900;font-size:1.3rem;color:#f59e0b;margin-bottom:4px">Bootcamp Complete!</div>
+  <div style="color:#d1d5db;font-size:.9rem;margin-bottom:20px">Congratulations, {student['name']}. You completed all 20 days.</div>
+  <a href="/student/certificate" class="btn btn-lg" style="background:#f59e0b;color:#000;font-weight:800">🎓 View &amp; Print Certificate →</a>
+</div>'''
+
     body = f"""
 {welcome_overlay}
 <div class="container">
-  {flash_html}{upgrade_bar}
+  {completion_banner}{flash_html}{upgrade_bar}
   <div class="card card-sm">
     <div class="flex items-center justify-between" style="margin-bottom:10px">
       <div><strong>Welcome back, {student['name']}!</strong>
-        <span class="text-muted text-sm" style="margin-left:10px">Day {student['current_day']} of 20</span></div>
+        <span class="text-muted text-sm" style="margin-left:10px">{"All 20 days complete 🎉" if student["current_day"] > 20 else "Day " + str(student["current_day"]) + " of 20"}</span></div>
       <span class="badge badge-new">{pct}% complete</span>
     </div>
     <div class="progress-wrap"><div class="progress-fill" style="width:{pct}%"></div></div>
@@ -1883,6 +1894,53 @@ async def student_dashboard(request: Request):
   <div class="grid-days">{days_html}</div>
 </div>"""
     return HTMLResponse(_page("Dashboard", body, _nav_student(student)))
+
+
+@app.get("/student/certificate", response_class=HTMLResponse)
+async def student_certificate(request: Request):
+    student = _get_student(request)
+    if not student: return RedirectResponse("/", 302)
+    student = dict(student)
+    if student["current_day"] <= 20:
+        return RedirectResponse("/student", 302)
+    completed_date = one(
+        "SELECT MAX(submitted_at) as d FROM submissions WHERE student_id=? AND grading_status='approved'",
+        (student["id"],)
+    )
+    date_str = str(completed_date["d"] or "")[:10] if completed_date else ""
+    cert_body = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Certificate — {student['name']}</title>
+<style>
+  @media print {{ .no-print {{ display:none }} body {{ margin:0 }} }}
+  body {{ font-family: Georgia, serif; background:#fafaf7; color:#1a1a1a; margin:0; padding:40px 20px; text-align:center }}
+  .cert {{ border:6px double #f59e0b; max-width:720px; margin:0 auto; padding:60px 48px; background:#fff; position:relative }}
+  .logo {{ font-family: -apple-system, sans-serif; font-size:1.1rem; font-weight:900; letter-spacing:.08em; color:#e53e3e; margin-bottom:8px }}
+  h1 {{ font-size:2.2rem; font-weight:400; margin:24px 0 8px }}
+  .name {{ font-size:2.8rem; font-weight:700; color:#1a1a1a; border-bottom:2px solid #f59e0b; display:inline-block; padding-bottom:4px; margin:16px 0 }}
+  .sub {{ font-size:1.1rem; color:#555; margin:0 0 32px }}
+  .stamp {{ font-size:3.5rem; margin:16px 0 }}
+  .date {{ font-size:.9rem; color:#888; margin-top:32px }}
+</style>
+</head>
+<body>
+<div class="cert">
+  <div class="logo">DAKO STUDIOS</div>
+  <div style="font-size:.85rem;color:#888;letter-spacing:.06em">DIGITAL SKILLS BOOTCAMP</div>
+  <h1>Certificate of Completion</h1>
+  <p style="color:#555;font-size:1rem">This certifies that</p>
+  <div class="name">{student['name']}</div>
+  <p class="sub">has successfully completed all 20 days of the<br><strong>Dako Studios Digital Skills Bootcamp</strong></p>
+  <div class="stamp">🏆</div>
+  <p style="color:#555;font-size:.9rem">Demonstrating proficiency in computer fundamentals, internet skills,<br>digital productivity, cybersecurity, and AI tools.</p>
+  {"<div class='date'>Completed: " + date_str + "</div>" if date_str else ""}
+</div>
+<div class="no-print" style="text-align:center;margin-top:24px">
+  <button onclick="window.print()" style="background:#f59e0b;color:#000;font-weight:700;padding:12px 28px;border:none;border-radius:8px;cursor:pointer;font-size:1rem">🖨️ Print / Save as PDF</button>
+  <a href="/student" style="margin-left:16px;color:#555;font-size:.9rem">← Back to dashboard</a>
+</div>
+</body></html>"""
+    return HTMLResponse(cert_body)
 
 
 @app.get("/student/day/{day_num}", response_class=HTMLResponse)
@@ -1958,7 +2016,7 @@ async def student_day(day_num: int, request: Request):
     <span class="badge {badge_cls}">{label}</span>
     <span class="text-xs text-muted">{str(s['submitted_at'])[:16]}</span>
   </div>
-  <div class="text-sm" style="white-space:pre-wrap;margin-bottom:8px">{s['answer_text']}</div>
+  <div class="text-sm" style="white-space:pre-wrap;margin-bottom:8px">{s['answer_text'] or '<em style="color:#9ca3af">No written answer submitted.</em>'}</div>
   {f'<div class="flex gap-2">{shots}</div>' if shots else ""}{coach_fb}{ai_fb}
 </div>"""
 
@@ -2018,21 +2076,25 @@ async def student_day(day_num: int, request: Request):
 def _paywall_page(student, day_num):
     currency, price = _student_currency_price(student)
     sym = _currency_symbol(currency)
-    return f"""<div class="container" style="max-width:600px">
-  <div class="card paywall-box">
-    <div style="font-size:3rem;margin-bottom:16px">🔒</div>
-    <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:8px">Day {day_num} is locked</h2>
-    <p class="text-muted" style="margin-bottom:24px">Days {FREE_DAYS+1}–20 require full access. Unlock once and learn forever.</p>
-    <div class="paywall-price" style="margin-bottom:8px"><span class="paywall-currency">{sym}</span>{int(price):,}</div>
-    <div class="text-muted text-sm" style="margin-bottom:24px">One-time · Lifetime access · All payment methods</div>
-    <ul class="feature-list" style="margin-bottom:24px">
-      <li>{20 - FREE_DAYS} more days of lessons and missions</li>
-      <li>Coach feedback on every submission</li>
-      <li>Pay by card, M-Pesa, MTN MoMo, bank transfer</li>
-      <li>Digital certificate on completion</li>
+    days_left = 20 - day_num + 1
+    return f"""<div class="container" style="max-width:560px;padding-top:32px">
+  <div class="card" style="padding:40px 36px;text-align:center">
+    <div style="font-size:3rem;margin-bottom:16px">🔓</div>
+    <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:8px">Unlock Day {day_num}–20</h2>
+    <p style="color:#6b7280;margin-bottom:6px">You've completed the free trial (Days 1–{FREE_DAYS}). Nice work!</p>
+    <p style="color:#6b7280;margin-bottom:24px">Unlock once to access the remaining <strong>{days_left} days</strong> — including missions, coach feedback, and your certificate.</p>
+    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:20px">
+      <div style="font-size:2.5rem;font-weight:900;color:#1a1a1a">{sym}{int(price):,}</div>
+      <div style="color:#9ca3af;font-size:.85rem;margin-top:4px">One-time payment · Lifetime access</div>
+    </div>
+    <ul style="text-align:left;list-style:none;padding:0;margin:0 0 24px;display:flex;flex-direction:column;gap:10px">
+      <li style="display:flex;gap:10px;align-items:center"><span style="color:#16a34a;font-weight:700">✓</span> {20 - FREE_DAYS} days of lessons &amp; hands-on missions</li>
+      <li style="display:flex;gap:10px;align-items:center"><span style="color:#16a34a;font-weight:700">✓</span> Personal coach feedback on every submission</li>
+      <li style="display:flex;gap:10px;align-items:center"><span style="color:#16a34a;font-weight:700">✓</span> Pay by card, bank transfer, M-Pesa, MTN MoMo, Verve</li>
+      <li style="display:flex;gap:10px;align-items:center"><span style="color:#16a34a;font-weight:700">✓</span> Digital certificate on completion</li>
     </ul>
-    <a href="/payment/checkout" class="btn btn-red btn-lg btn-full">Unlock Full Bootcamp — {sym}{int(price):,}</a>
-    <div class="mt-3"><a href="/student" class="text-sm text-muted">← Back to dashboard</a></div>
+    <a href="/payment/checkout" class="btn btn-red btn-lg btn-full">Unlock All 20 Days — {sym}{int(price):,} →</a>
+    <div style="margin-top:16px"><a href="/student" style="color:#9ca3af;font-size:.85rem">← Back to dashboard</a></div>
   </div>
 </div>"""
 
@@ -2601,10 +2663,19 @@ async def coach_grade(sub_id: int, request: Request, verdict: str = Form(...), f
         # In legacy mode we fake an evaluation
         log_assessment_event("assessment_completed", sub_id, rubric_id=sub["assessment_id"], rubric_version=1, total_score=100.0 if verdict=='approved' else 0.0, passed=(verdict=='approved'), reviewer=coach["name"])
             
-        if verdict == "approved":
-            st = one("SELECT * FROM students WHERE id=?", (sub["student_id"],))
-            if st and st["current_day"] == sub["assessment_id"] and st["current_day"] < 20:
+        st = one("SELECT * FROM students WHERE id=?", (sub["student_id"],))
+        if verdict == "approved" and st:
+            if st["current_day"] == sub["assessment_id"] and st["current_day"] < 20:
                 run("UPDATE students SET current_day=current_day+1 WHERE id=?", (st["id"],))
+            from email_service import send_day_passed, send_completion
+            next_day = (st["current_day"] or 1) + 1
+            if next_day > 20:
+                send_completion(st["name"], st["email"])
+            else:
+                send_day_passed(st["name"], st["email"], sub["assessment_id"], next_day)
+        elif verdict == "revision_requested" and st:
+            from email_service import send_revision_requested
+            send_revision_requested(st["name"], st["email"], sub["assessment_id"], feedback.strip())
 
     return RedirectResponse("/coach/dashboard", 302)
 
