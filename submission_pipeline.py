@@ -35,16 +35,31 @@ def get_or_create_draft(student_id: int, assessment_id: int) -> dict:
                 "SELECT * FROM submissions WHERE student_id=? AND assessment_id=? AND submission_status='draft'",
                 (student_id, assessment_id)
             ).fetchone()
-            
+
             if draft:
                 return dict(draft)
-                
-            # Check how many non-draft attempts exist
+
+            # If coach requested a revision, reopen that submission as a draft
+            # so the student can edit and resubmit without hitting the attempt cap.
+            revision = conn.execute(
+                "SELECT * FROM submissions WHERE student_id=? AND assessment_id=? AND grading_status='revision_requested'",
+                (student_id, assessment_id)
+            ).fetchone()
+
+            if revision:
+                conn.execute(
+                    "UPDATE submissions SET submission_status='draft', grading_status='pending' WHERE id=?",
+                    (revision["id"],)
+                )
+                log_submission_event("draft_reopened_for_revision", revision["id"], assessment_id, student_id, revision["attempt_number"])
+                return dict(revision) | {"submission_status": "draft", "grading_status": "pending"}
+
+            # Check how many finalised (non-draft, non-revision) attempts exist
             attempts = conn.execute(
                 "SELECT COUNT(*) as c FROM submissions WHERE student_id=? AND assessment_id=? AND submission_status != 'draft'",
                 (student_id, assessment_id)
             ).fetchone()["c"]
-            
+
             if attempts >= assessment["max_attempts"]:
                 raise HTTPException(403, f"Max attempts ({assessment['max_attempts']}) reached")
                 

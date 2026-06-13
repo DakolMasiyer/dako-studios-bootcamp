@@ -603,6 +603,27 @@ document.addEventListener('click', function(e) {
         document.querySelectorAll('.nav-dropdown.open').forEach(m => m.classList.remove('open'));
     }
 });
+async function aiDraft(subId, btn) {
+    const ta = document.getElementById('fb-' + subId);
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating…';
+    try {
+        const res = await fetch('/coach/grade/' + subId + '/ai-suggest');
+        const data = await res.json();
+        if (data.feedback) {
+            ta.value = data.feedback;
+            ta.focus();
+        } else {
+            alert(data.error || 'AI draft unavailable — write feedback manually.');
+        }
+    } catch(e) {
+        alert('Could not reach AI service. Write feedback manually.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+    }
+}
 """
 
 def _page(title, body, nav="", extra_css="", lang="en"):
@@ -2316,11 +2337,17 @@ async def coach_dashboard(request: Request):
     <div class="text-sm" style="white-space:pre-wrap">{p['answer_text']}</div>
   </div>
   {f'<div class="flex gap-2" style="margin-bottom:12px">{shots}</div>' if shots else ""}
-  <form method="POST" action="/coach/grade/{p['id']}" style="display:flex;gap:10px;align-items:flex-start">
-    <textarea name="feedback" placeholder="Feedback (optional)..." style="flex:1;min-height:64px;font-size:.85rem"></textarea>
-    <div style="display:flex;flex-direction:column;gap:8px;min-width:150px">
-      <button name="verdict" value="approved" class="btn btn-green">✓ Pass</button>
+  <form method="POST" action="/coach/grade/{p['id']}">
+    <div style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">Feedback to Student</label>
+        <button type="button" onclick="aiDraft({p['id']}, this)" style="font-size:.75rem;padding:4px 10px;border-radius:6px;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;color:#374151">✨ AI Draft</button>
+      </div>
+      <textarea id="fb-{p['id']}" name="feedback" placeholder="Write feedback for the student, or click ✨ AI Draft to generate a suggestion..." style="width:100%;min-height:100px;font-size:.875rem;padding:10px;border:1px solid #e5e7eb;border-radius:8px;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
       <button name="verdict" value="revision_requested" class="btn btn-orange">⟳ Needs Revision</button>
+      <button name="verdict" value="approved" class="btn btn-green">✓ Pass</button>
     </div>
   </form>
 </div>"""
@@ -2339,6 +2366,55 @@ async def coach_dashboard(request: Request):
   {rows_html}
 </div>"""
     return HTMLResponse(_page("Coach Dashboard", body, _nav_coach(coach)))
+
+
+@app.get("/coach/grade/{sub_id}/ai-suggest")
+async def coach_ai_suggest(sub_id: int, request: Request):
+    from fastapi.responses import JSONResponse
+    coach = _get_coach(request)
+    if not coach:
+        return JSONResponse({"error": "Not authorised"}, status_code=401)
+
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return JSONResponse({"error": "AI feedback not configured — add GOOGLE_API_KEY to Vercel env vars."})
+
+    sub = one("""SELECT su.*, a.answer_text, c.title as day_title, st.name as student_name
+                 FROM submissions su
+                 JOIN students st ON su.student_id = st.id
+                 LEFT JOIN submission_answers a ON a.submission_id = su.id
+                 LEFT JOIN curriculum c ON c.day = su.assessment_id
+                 WHERE su.id=?""", (sub_id,))
+    if not sub:
+        return JSONResponse({"error": "Submission not found"}, status_code=404)
+
+    prompt = (
+        f"You are a bootcamp coach writing concise, encouraging feedback for a student.\n"
+        f"Student: {sub['student_name']}\n"
+        f"Day {sub['assessment_id']}: {sub['day_title'] or ''}\n\n"
+        f"Student's answer:\n{sub['answer_text'] or '(no text answer)'}\n\n"
+        f"Write 2-3 sentences of actionable feedback. Be specific, warm, and direct. "
+        f"No preamble — just the feedback text itself."
+    )
+
+    try:
+        import httpx as _httpx
+        model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        resp = _httpx.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+            json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                  "generationConfig": {"temperature": 0.4, "maxOutputTokens": 256}},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        text = ""
+        for cand in resp.json().get("candidates", []):
+            for part in (cand.get("content") or {}).get("parts", []):
+                text += part.get("text", "")
+        return JSONResponse({"feedback": text.strip()})
+    except Exception as exc:
+        return JSONResponse({"error": f"AI generation failed: {exc}"})
 
 
 @app.post("/coach/grade/{sub_id}")
