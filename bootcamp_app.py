@@ -1040,13 +1040,12 @@ def _login_page(error="", tab="login"):
       </form>
     </div>
     <div id="tab-register" class="tab-panel {'active' if tab=='register' else ''}">
-      <div class="alert alert-info" style="margin-bottom:16px">Days 1–{FREE_DAYS} are <strong>completely free</strong>. No card required to start.</div>
-      <form method="POST" action="/register">
-        <div class="form-group"><label class="form-label">Full Name</label><input type="text" name="name" placeholder="Your Name" required></div>
-        <div class="form-group"><label class="form-label">Email</label><input type="email" name="email" placeholder="your@email.com" required></div>
-        <div class="form-group"><label class="form-label">Password</label><input type="password" name="password" placeholder="Min 6 characters" required minlength="6"></div>
-        <button class="btn btn-red btn-full">Start Free — Day 1</button>
-      </form>
+      <div style="text-align:center;padding:8px 0 16px">
+        <div style="font-size:2rem;margin-bottom:12px">🎯</div>
+        <p style="font-weight:700;font-size:1rem;margin:0 0 8px">New here?</p>
+        <p style="color:#888;font-size:0.9rem;margin:0 0 20px">Days 1–{FREE_DAYS} are <strong>completely free</strong>. No card required to start.</p>
+        <a href="/onboarding" class="btn btn-red btn-full" style="display:block;text-align:center;text-decoration:none">Start Free — Day 1 →</a>
+      </div>
     </div>
     <div class="mt-3" style="text-align:center"><a href="/pricing" class="text-sm text-muted">See what's included →</a></div>
   </div>
@@ -1064,16 +1063,8 @@ async def login(email: str = Form(...), password: str = Form(...)):
     return resp
 
 @app.post("/register")
-async def register(name: str = Form(...), email: str = Form(...), password: str = Form(...)):
-    if one("SELECT id FROM students WHERE email=?", (email,)):
-        return HTMLResponse(_page("Register", _login_page("Email already registered", "register")))
-    sid = run("INSERT INTO students (name,email,password_hash,current_day,paid_access) VALUES (?,?,?,1,0)",
-              (name.strip(), email.strip(), _hash(password)))
-    tok = _token()
-    run("INSERT INTO sessions (token, student_id) VALUES (?,?)", (tok, sid))
-    resp = RedirectResponse("/student", 302)
-    resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
-    return resp
+async def register():
+    return RedirectResponse("/onboarding", 302)
 
 @app.get("/logout")
 async def logout():
@@ -1264,6 +1255,8 @@ async def onboarding_post3(
     )
     tok = _token()
     run("INSERT INTO sessions (token, student_id) VALUES (?,?)", (tok, sid))
+    from email_service import send_welcome
+    send_welcome(name.strip(), email.strip())
     resp = RedirectResponse("/student?welcome=1", 302)
     resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
     resp.delete_cookie("ob_skill")
@@ -1520,6 +1513,10 @@ async def payment_return(request: Request, tx_ref: str = "", status: str = "", t
                 run("UPDATE students SET paid_access=1 WHERE id=?", (payment["student_id"],))
                 log_payment_event("payment_verified", tx_ref, payment["student_id"], payment["amount"],
                                   flw_ref=transaction_id, status="success")
+                _s = one("SELECT name, email FROM students WHERE id=?", (payment["student_id"],))
+                if _s:
+                    from email_service import send_payment_confirmed
+                    send_payment_confirmed(_s["name"], _s["email"])
                 return RedirectResponse("/student?payment=success", 302)
         except Exception:
             pass  # fall through to holding page
@@ -1632,6 +1629,7 @@ async def payment_webhook(request: Request):
             conn.execute("UPDATE webhook_logs SET status='processed' WHERE id=?", (webhook_id,))
     except Exception as e:
         run("UPDATE webhook_logs SET status='failed_db_lock' WHERE id=?", (webhook_id,))
+
         run(
             "UPDATE payments SET reconciliation_attempts=reconciliation_attempts+1, last_reconciliation_error=?, raw_provider_payload=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (str(e), json.dumps(body), payment["id"])
@@ -1641,7 +1639,11 @@ async def payment_webhook(request: Request):
         
     log_payment_event("payment_verified", tx_ref, payment["student_id"], payment["amount"], flw_ref=flw_ref, webhook_event_id=str(webhook_id), status="success")
     log_payment_event("enrollment_activated", tx_ref, payment["student_id"], payment["amount"], flw_ref=flw_ref, webhook_event_id=str(webhook_id))
-    
+    _s = one("SELECT name, email FROM students WHERE id=?", (payment["student_id"],))
+    if _s:
+        from email_service import send_payment_confirmed
+        send_payment_confirmed(_s["name"], _s["email"])
+
     return {"status": "success"}
 
 async def reconcile_pending_payments(limit: int = 25):
@@ -2072,7 +2074,10 @@ async def submit_day(day_num: int, request: Request, answer: str = Form(...), sc
             
         finalize_attempt(attempt_id)
         finalize_submission(sub_id)
-        
+        from email_service import send_submission_received, send_coach_new_submission
+        send_submission_received(student["name"], student["email"], day_num)
+        send_coach_new_submission(student["name"], day_num, sub_id)
+
     except HTTPException as e:
         raise e
 

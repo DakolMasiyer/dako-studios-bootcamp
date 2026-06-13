@@ -103,11 +103,12 @@ def evaluate_submission(submission_id: int, override_rubric_id: int = None) -> i
         conn.execute("UPDATE submissions SET grading_status=?, feedback_summary=?, updated_at=? WHERE id=?", 
             (pass_fail_status, f"Scored {total_score:.1f}/{sum(s['max_score'] * s['weight_percentage']/100.0 for s in sections)}", now, submission_id))
 
-        # 10. Update student progression if approved
-        if passed:
-            st = conn.execute("SELECT * FROM students WHERE id=?", (sub["student_id"],)).fetchone()
-            if st and st["current_day"] == sub["assessment_id"]:
-                conn.execute("UPDATE students SET current_day=current_day+1 WHERE id=?", (st["id"],))
+        # 10. Update student progression if approved; capture email data before commit
+        _email_student = conn.execute("SELECT name, email, current_day FROM students WHERE id=?", (sub["student_id"],)).fetchone()
+        _advanced = False
+        if passed and _email_student and _email_student["current_day"] == sub["assessment_id"]:
+            conn.execute("UPDATE students SET current_day=current_day+1 WHERE id=?", (sub["student_id"],))
+            _advanced = True
 
         import uuid
         job_id = str(uuid.uuid4())
@@ -120,7 +121,22 @@ def evaluate_submission(submission_id: int, override_rubric_id: int = None) -> i
 
         # 11. Log natively
         log_assessment_event("rubric_evaluation_completed", submission_id, rubric_id, rubric["rubric_version"], total_score, passed)
-        
+
+        # 12. Send emails after commit so they only fire on persisted state
+        if _email_student:
+            try:
+                from email_service import send_day_passed, send_completion, send_revision_requested
+                if _advanced:
+                    _next_day = _email_student["current_day"] + 1
+                    if _next_day > 20:
+                        send_completion(_email_student["name"], _email_student["email"])
+                    else:
+                        send_day_passed(_email_student["name"], _email_student["email"], _email_student["current_day"], _next_day)
+                elif not passed:
+                    send_revision_requested(_email_student["name"], _email_student["email"], sub["assessment_id"], "")
+            except Exception:
+                pass
+
         from ai_feedback_queue import trigger_feedback_job
         try:
             trigger_feedback_job(job_id, grading_result_id)
@@ -157,14 +173,33 @@ def manual_override(grading_result_id: int, new_score: float, new_status: str, r
                      (new_status, f"Manually overridden to {new_status} ({new_score} pts). Reason: {reason}", now, res["submission_id"]))
                      
         # If changed to approved, advance student
-        if new_status == "approved":
+        _email_data = None
+        if new_status in ("approved", "revision_requested"):
             sub = conn.execute("SELECT student_id, assessment_id FROM submissions WHERE id=?", (res["submission_id"],)).fetchone()
-            st = conn.execute("SELECT id, current_day FROM students WHERE id=?", (sub["student_id"],)).fetchone()
-            if st and st["current_day"] == sub["assessment_id"]:
+            st = conn.execute("SELECT id, current_day, name, email FROM students WHERE id=?", (sub["student_id"],)).fetchone()
+            if new_status == "approved" and st and st["current_day"] == sub["assessment_id"]:
                 conn.execute("UPDATE students SET current_day=current_day+1 WHERE id=?", (st["id"],))
-                
+                _email_data = ("approved", dict(st), sub["assessment_id"])
+            elif new_status == "revision_requested" and st:
+                _email_data = ("revision", dict(st), sub["assessment_id"])
+
         conn.execute("COMMIT")
-        
+
+        if _email_data:
+            try:
+                kind, _st, _day = _email_data
+                from email_service import send_day_passed, send_completion, send_revision_requested
+                if kind == "approved":
+                    _next = _st["current_day"] + 1
+                    if _next > 20:
+                        send_completion(_st["name"], _st["email"])
+                    else:
+                        send_day_passed(_st["name"], _st["email"], _day, _next)
+                elif kind == "revision":
+                    send_revision_requested(_st["name"], _st["email"], _day, reason)
+            except Exception:
+                pass
+
         log_assessment_event("manual_score_override", res["submission_id"], res["rubric_id"], res["rubric_version"], new_score, new_status=='approved', reviewer=reviewer)
     except Exception as e:
         conn.rollback()
