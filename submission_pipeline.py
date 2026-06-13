@@ -80,7 +80,7 @@ def get_or_create_draft(student_id: int, assessment_id: int) -> dict:
             # since we just inserted it.
             
             sub = conn.execute(
-                "SELECT * FROM submissions WHERE student_id=? AND assessment_id=? AND submission_status='draft'",
+                "SELECT * FROM submissions WHERE student_id=? AND assessment_id=? AND submission_status='draft' ORDER BY id DESC LIMIT 1",
                 (student_id, assessment_id)
             ).fetchone()
             sub_id = sub["id"]
@@ -115,7 +115,7 @@ async def process_safe_upload(submission_id: int, file: UploadFile) -> None:
         return
         
     try:
-        with db.transaction() as conn:
+        with db.transaction(immediate=True) as conn:
             sub = conn.execute("SELECT student_id, assessment_id, submission_status FROM submissions WHERE id=?", (submission_id,)).fetchone()
         
         if not sub or sub["submission_status"] != "draft":

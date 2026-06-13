@@ -255,6 +255,7 @@ def init_db():
         background TEXT NOT NULL,
         motivation TEXT NOT NULL,
         country    TEXT NOT NULL,
+        status     TEXT NOT NULL DEFAULT 'pending',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 

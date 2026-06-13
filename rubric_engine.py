@@ -48,7 +48,7 @@ def evaluate_submission(submission_id: int, override_rubric_id: int = None) -> i
         rubric_id = override_rubric_id or 1 # Fallback to 1 for now if no mapping exists
         rubric = conn.execute("SELECT * FROM rubrics WHERE id=?", (rubric_id,)).fetchone()
         if not rubric:
-            raise ValueError(f"Rubric {rubric_id} not found")
+            raise ValueError(f"Rubric {rubric_id} not found — check that the default rubric is seeded in the database")
 
         sections = conn.execute("SELECT * FROM rubric_sections WHERE rubric_id=?", (rubric_id,)).fetchall()
         
@@ -104,7 +104,7 @@ def evaluate_submission(submission_id: int, override_rubric_id: int = None) -> i
             (pass_fail_status, f"Scored {total_score:.1f}/{sum(s['max_score'] * s['weight_percentage']/100.0 for s in sections)}", now, submission_id))
 
         # 10. Update student progression if approved; capture email data before commit
-        _email_student = conn.execute("SELECT name, email, current_day FROM students WHERE id=?", (sub["student_id"],)).fetchone()
+        _email_student = conn.execute("SELECT name, email, current_day, preferred_lang FROM students WHERE id=?", (sub["student_id"],)).fetchone()
         _advanced = False
         if passed and _email_student and _email_student["current_day"] == sub["assessment_id"]:
             conn.execute("UPDATE students SET current_day=current_day+1 WHERE id=?", (sub["student_id"],))
@@ -126,14 +126,15 @@ def evaluate_submission(submission_id: int, override_rubric_id: int = None) -> i
         if _email_student:
             try:
                 from email_service import send_day_passed, send_completion, send_revision_requested
+                _lang = _email_student.get("preferred_lang") or "en"
                 if _advanced:
                     _next_day = _email_student["current_day"] + 1
                     if _next_day > 20:
-                        send_completion(_email_student["name"], _email_student["email"])
+                        send_completion(_email_student["name"], _email_student["email"], lang=_lang)
                     else:
-                        send_day_passed(_email_student["name"], _email_student["email"], _email_student["current_day"], _next_day)
+                        send_day_passed(_email_student["name"], _email_student["email"], _email_student["current_day"], _next_day, lang=_lang)
                 elif not passed:
-                    send_revision_requested(_email_student["name"], _email_student["email"], sub["assessment_id"], "")
+                    send_revision_requested(_email_student["name"], _email_student["email"], sub["assessment_id"], "", lang=_lang)
             except Exception:
                 pass
 
@@ -176,7 +177,7 @@ def manual_override(grading_result_id: int, new_score: float, new_status: str, r
         _email_data = None
         if new_status in ("approved", "revision_requested"):
             sub = conn.execute("SELECT student_id, assessment_id FROM submissions WHERE id=?", (res["submission_id"],)).fetchone()
-            st = conn.execute("SELECT id, current_day, name, email FROM students WHERE id=?", (sub["student_id"],)).fetchone()
+            st = conn.execute("SELECT id, current_day, name, email, preferred_lang FROM students WHERE id=?", (sub["student_id"],)).fetchone()
             if new_status == "approved" and st and st["current_day"] == sub["assessment_id"]:
                 conn.execute("UPDATE students SET current_day=current_day+1 WHERE id=?", (st["id"],))
                 _email_data = ("approved", dict(st), sub["assessment_id"])
@@ -188,15 +189,16 @@ def manual_override(grading_result_id: int, new_score: float, new_status: str, r
         if _email_data:
             try:
                 kind, _st, _day = _email_data
+                _lang = _st.get("preferred_lang") or "en"
                 from email_service import send_day_passed, send_completion, send_revision_requested
                 if kind == "approved":
                     _next = _st["current_day"] + 1
                     if _next > 20:
-                        send_completion(_st["name"], _st["email"])
+                        send_completion(_st["name"], _st["email"], lang=_lang)
                     else:
-                        send_day_passed(_st["name"], _st["email"], _day, _next)
+                        send_day_passed(_st["name"], _st["email"], _day, _next, lang=_lang)
                 elif kind == "revision":
-                    send_revision_requested(_st["name"], _st["email"], _day, reason)
+                    send_revision_requested(_st["name"], _st["email"], _day, reason, lang=_lang)
             except Exception:
                 pass
 

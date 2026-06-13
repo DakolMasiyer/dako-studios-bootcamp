@@ -159,6 +159,13 @@ def _is_local_dev() -> bool:
     return BASE_URL.startswith("http://localhost") or BASE_URL.startswith("http://127.0.0.1")
 
 @app.on_event("startup")
+async def _run_schema_patches():
+    try:
+        run("ALTER TABLE creative_tech_applications ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
+    except Exception:
+        pass  # column already exists
+
+@app.on_event("startup")
 async def _guard_default_credentials():
     if not _is_vercel_runtime():
         return
@@ -1257,7 +1264,7 @@ async def onboarding_post3(
     tok = _token()
     run("INSERT INTO sessions (token, student_id) VALUES (?,?)", (tok, sid))
     from email_service import send_welcome
-    send_welcome(name.strip(), email.strip())
+    send_welcome(name.strip(), email.strip(), lang=preferred_lang)
     resp = RedirectResponse("/student?welcome=1", 302)
     resp.set_cookie("s_token", tok, httponly=True, max_age=86400 * 7, secure=True, samesite="lax")
     resp.delete_cookie("ob_skill")
@@ -1430,7 +1437,7 @@ async def payment_checkout(request: Request):
             log_payment_event("payment_verified", tx_ref, student["id"], price, flw_ref="dev-bypass", status="success")
             log_payment_event("enrollment_activated", tx_ref, student["id"], price, flw_ref="dev-bypass")
             from email_service import send_payment_confirmed
-            send_payment_confirmed(student["name"], student["email"])
+            send_payment_confirmed(student["name"], student["email"], lang=student.get("preferred_lang", "en"))
             return RedirectResponse("/student?payment=success", 302)
 
         return HTMLResponse(_page("Payment",
@@ -1516,10 +1523,10 @@ async def payment_return(request: Request, tx_ref: str = "", status: str = "", t
                 run("UPDATE students SET paid_access=1 WHERE id=?", (payment["student_id"],))
                 log_payment_event("payment_verified", tx_ref, payment["student_id"], payment["amount"],
                                   flw_ref=transaction_id, status="success")
-                _s = one("SELECT name, email FROM students WHERE id=?", (payment["student_id"],))
+                _s = one("SELECT name, email, preferred_lang FROM students WHERE id=?", (payment["student_id"],))
                 if _s:
                     from email_service import send_payment_confirmed
-                    send_payment_confirmed(_s["name"], _s["email"])
+                    send_payment_confirmed(_s["name"], _s["email"], lang=_s.get("preferred_lang") or "en")
                 return RedirectResponse("/student?payment=success", 302)
         except Exception:
             pass  # fall through to holding page
@@ -1642,10 +1649,10 @@ async def payment_webhook(request: Request):
         
     log_payment_event("payment_verified", tx_ref, payment["student_id"], payment["amount"], flw_ref=flw_ref, webhook_event_id=str(webhook_id), status="success")
     log_payment_event("enrollment_activated", tx_ref, payment["student_id"], payment["amount"], flw_ref=flw_ref, webhook_event_id=str(webhook_id))
-    _s = one("SELECT name, email FROM students WHERE id=?", (payment["student_id"],))
+    _s = one("SELECT name, email, preferred_lang FROM students WHERE id=?", (payment["student_id"],))
     if _s:
         from email_service import send_payment_confirmed
-        send_payment_confirmed(_s["name"], _s["email"])
+        send_payment_confirmed(_s["name"], _s["email"], lang=_s.get("preferred_lang") or "en")
 
     return {"status": "success"}
 
@@ -2138,7 +2145,7 @@ async def submit_day(day_num: int, request: Request, answer: str = Form(...), sc
         finalize_attempt(attempt_id)
         finalize_submission(sub_id)
         from email_service import send_submission_received, send_coach_new_submission
-        send_submission_received(student["name"], student["email"], day_num)
+        send_submission_received(student["name"], student["email"], day_num, lang=student.get("preferred_lang") or "en")
         send_coach_new_submission(student["name"], day_num, sub_id)
 
     except HTTPException as e:
@@ -2667,15 +2674,16 @@ async def coach_grade(sub_id: int, request: Request, verdict: str = Form(...), f
         if verdict == "approved" and st:
             if st["current_day"] == sub["assessment_id"] and st["current_day"] < 20:
                 run("UPDATE students SET current_day=current_day+1 WHERE id=?", (st["id"],))
+            _lang = st.get("preferred_lang") or "en"
             from email_service import send_day_passed, send_completion
             next_day = (st["current_day"] or 1) + 1
             if next_day > 20:
-                send_completion(st["name"], st["email"])
+                send_completion(st["name"], st["email"], lang=_lang)
             else:
-                send_day_passed(st["name"], st["email"], sub["assessment_id"], next_day)
+                send_day_passed(st["name"], st["email"], sub["assessment_id"], next_day, lang=_lang)
         elif verdict == "revision_requested" and st:
             from email_service import send_revision_requested
-            send_revision_requested(st["name"], st["email"], sub["assessment_id"], feedback.strip())
+            send_revision_requested(st["name"], st["email"], sub["assessment_id"], feedback.strip(), lang=st.get("preferred_lang") or "en")
 
     return RedirectResponse("/coach/dashboard", 302)
 
@@ -3140,23 +3148,58 @@ async def regenerate_ai_feedback(grading_result_id: int, request: Request):
     return RedirectResponse(request.headers.get("referer", "/coach/dashboard"), 302)
 
 
+@app.post("/coach/applications/{app_id}/status")
+async def coach_application_set_status(request: Request, app_id: int, status: str = Form(...)):
+    coach = _get_coach(request)
+    if not coach:
+        return RedirectResponse("/coach", 302)
+    if status not in ("pending", "reviewed", "accepted", "rejected"):
+        raise HTTPException(400, "Invalid status")
+    run("UPDATE creative_tech_applications SET status=? WHERE id=?", (status, app_id))
+    return RedirectResponse("/coach/applications", 302)
+
+
+_APP_STATUS_COLORS = {
+    "pending":  ("background:#374151;color:#d1d5db", "Pending"),
+    "reviewed": ("background:#1e3a5f;color:#93c5fd", "Reviewed"),
+    "accepted": ("background:#14532d;color:#86efac", "Accepted"),
+    "rejected": ("background:#7f1d1d;color:#fca5a5", "Rejected"),
+}
+
+
 @app.get("/coach/applications", response_class=HTMLResponse)
 async def coach_applications(request: Request):
     coach = _get_coach(request)
     if not coach:
         return RedirectResponse("/coach", 302)
     apps = query(
-        "SELECT id, name, email, country, background, motivation, created_at "
+        "SELECT id, name, email, country, background, motivation, created_at, "
+        "COALESCE(status,'pending') as status "
         "FROM creative_tech_applications ORDER BY created_at DESC"
     )
+    def _status_badge(s):
+        style, label = _APP_STATUS_COLORS.get(s, _APP_STATUS_COLORS["pending"])
+        return f'<span style="font-size:11px;padding:2px 8px;border-radius:9999px;{style}">{label}</span>'
+    def _status_form(app_id, current):
+        opts = "".join(
+            f'<option value="{v}"{" selected" if v==current else ""}>{label}</option>'
+            for v, (_, label) in _APP_STATUS_COLORS.items()
+        )
+        return (
+            f'<form method="post" action="/coach/applications/{app_id}/status" style="display:inline">'
+            f'<select name="status" onchange="this.form.submit()" '
+            f'style="background:#111;color:#ddd;border:1px solid #333;border-radius:4px;padding:2px 4px;font-size:12px">'
+            f'{opts}</select></form>'
+        )
     rows = "".join(
-        f'<tr>'
-        f'<td>{a["name"]}</td>'
-        f'<td><a href="mailto:{a["email"]}">{a["email"]}</a></td>'
-        f'<td>{a["country"]}</td>'
-        f'<td style="max-width:240px;white-space:normal">{a["background"][:120]}{"…" if len(a["background"])>120 else ""}</td>'
-        f'<td style="max-width:240px;white-space:normal">{a["motivation"][:120]}{"…" if len(a["motivation"])>120 else ""}</td>'
-        f'<td style="white-space:nowrap">{a["created_at"][:10]}</td>'
+        f'<tr style="border-bottom:1px solid #2a2a2a">'
+        f'<td style="padding:10px 8px">{a["name"]}</td>'
+        f'<td style="padding:10px 8px"><a href="mailto:{a["email"]}" style="color:#e53e3e">{a["email"]}</a></td>'
+        f'<td style="padding:10px 8px">{a["country"]}</td>'
+        f'<td style="padding:10px 8px;max-width:200px;white-space:normal;color:#bbb">{a["background"][:100]}{"…" if len(a["background"])>100 else ""}</td>'
+        f'<td style="padding:10px 8px;max-width:200px;white-space:normal;color:#bbb">{a["motivation"][:100]}{"…" if len(a["motivation"])>100 else ""}</td>'
+        f'<td style="padding:10px 8px;white-space:nowrap">{a["created_at"][:10]}</td>'
+        f'<td style="padding:10px 8px">{_status_form(a["id"], a["status"])}</td>'
         f'</tr>'
         for a in apps
     )
@@ -3170,8 +3213,9 @@ async def coach_applications(request: Request):
     <th style="padding:10px 8px">Background</th>
     <th style="padding:10px 8px">Motivation</th>
     <th style="padding:10px 8px">Date</th>
+    <th style="padding:10px 8px">Status</th>
   </tr></thead>
-  <tbody>{rows if rows else '<tr><td colspan="6" style="padding:16px;color:#888">No applications yet.</td></tr>'}</tbody>
+  <tbody>{rows if rows else '<tr><td colspan="7" style="padding:16px;color:#888">No applications yet.</td></tr>'}</tbody>
 </table>"""
-    nav = f'<a href="/coach/dashboard">← Dashboard</a>'
+    nav = '<a href="/coach/dashboard">← Dashboard</a>'
     return HTMLResponse(_page("Applications", body, nav=nav))
