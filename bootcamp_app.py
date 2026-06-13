@@ -1400,7 +1400,7 @@ async def payment_checkout(request: Request):
 
     if not FLW_SECRET:
         if _is_local_dev() and ALLOW_PAYMENT_DEV_BYPASS:
-            tx_ref = f"dako-{student['id']}-{uuid.uuid4().hex[:8]}"
+            tx_ref = f"bootcamp-{student['id']}-{uuid.uuid4().hex[:8]}"
             now = datetime.utcnow().isoformat()[:19]
             run(
                 """
@@ -1421,7 +1421,7 @@ async def payment_checkout(request: Request):
             '<div class="container"><div class="alert alert-warn">Payment is not configured yet. '
             'Set FLUTTERWAVE_SECRET_KEY or FLW_CLIENT_SECRET in your environment variables.</div></div>'))
 
-    tx_ref = f"dako-{student['id']}-{uuid.uuid4().hex[:8]}"
+    tx_ref = f"bootcamp-{student['id']}-{uuid.uuid4().hex[:8]}"
     # Insert pending payment record
     run("INSERT OR IGNORE INTO payments (student_id, amount, currency, tx_ref, status) VALUES (?,?,?,?,?)",
         (student["id"], PRICE_USD, "USD", tx_ref, "pending"))
