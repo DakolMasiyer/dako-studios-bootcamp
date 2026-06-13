@@ -291,6 +291,7 @@ textarea{resize:vertical;min-height:110px}
 .badge-pending{background:#fef3c7;color:#92400e}
 .badge-approved{background:#dcfce7;color:#166534}
 .badge-revision{background:#fee2e2;color:#991b1b}
+.badge-revision-requested{background:#fef3c7;color:#92400e}
 .badge-locked{background:#f3f4f6;color:#6b7280}
 .badge-new{background:#dbeafe;color:#1e40af}
 .badge-draft{background:#f3f4f6;color:#6b7280}
@@ -2099,11 +2100,11 @@ def _student_account_page(student, submissions=None, payments=None, error="", sa
     if submissions is not None:
         total = len(submissions)
         passed = sum(1 for s in submissions if s["grading_status"] == "approved")
-        revision = sum(1 for s in submissions if s["grading_status"] == "revision")
+        revision = sum(1 for s in submissions if s["grading_status"] == "revision_requested")
         rows = "".join(
             f'<tr><td>Day {s["assessment_id"]}</td><td>{str(s["submitted_at"])[:10]}</td>'
-            f'<td><span class="badge badge-{"approved" if s["grading_status"]=="approved" else "revision" if s["grading_status"]=="revision" else "pending"}">'
-            f'{s["grading_status"].title()}</span></td></tr>'
+            f'<td><span class="badge badge-{"approved" if s["grading_status"]=="approved" else "revision-requested" if s["grading_status"]=="revision_requested" else "pending"}">'
+            f'{"Passed" if s["grading_status"]=="approved" else "Needs Revision" if s["grading_status"]=="revision_requested" else "Pending"}</span></td></tr>'
             for s in submissions[:20]
         )
         sub_html = f"""<hr class="divider"><h4>Submission History</h4>
@@ -2120,7 +2121,7 @@ def _student_account_page(student, submissions=None, payments=None, error="", sa
     if payments:
         rows = "".join(
             f'<tr><td>{str(p["created_at"])[:10]}</td><td>${p["amount"]} {p["currency"]}</td>'
-            f'<td><span class="badge badge-{"approved" if p["status"]=="success" else "revision"}">{p["status"].title()}</span></td></tr>'
+            f'<td><span class="badge badge-{"approved" if p["status"]=="success" else "pending" if p["status"]=="pending" else "revision"}">{p["status"].title()}</span></td></tr>'
             for p in payments
         )
         pay_html = f"""<hr class="divider"><h4>Payment History</h4>
@@ -2255,14 +2256,69 @@ async def start_exam(exam_id: int, request: Request):
 async def view_exam(attempt_id: int, request: Request):
     student = _get_student(request)
     if not student: return RedirectResponse("/", 302)
-    
+
     state = get_exam_state(attempt_id)
     if state["session_status"] != "active":
-        return HTMLResponse(_page("Exam Ended", f"<div class='alert'>Exam session is {state['session_status']}</div>"))
-        
-    # In a real app we'd render the questions array.
-    # For now we just return JSON state
-    return state
+        ended_body = f"""<div class="container" style="max-width:520px;padding-top:60px;text-align:center">
+  <div class="card" style="padding:40px 32px">
+    <div style="font-size:2.5rem;margin-bottom:12px">⏱️</div>
+    <h2 style="font-size:1.3rem;font-weight:800;margin-bottom:8px">Exam session {state['session_status']}</h2>
+    <p class="text-muted" style="margin-bottom:24px">This exam attempt is no longer active.</p>
+    <a href="/student" class="btn btn-red">Back to Dashboard</a>
+  </div>
+</div>"""
+        return HTMLResponse(_page("Exam Ended", ended_body))
+
+    questions = state.get("questions", [])
+    q_html = ""
+    for i, q in enumerate(questions):
+        choices_html = ""
+        for c in q.get("choices", []):
+            choices_html += f"""<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:8px;cursor:pointer;margin-bottom:8px">
+  <input type="radio" name="q_{q['question_key']}" value="{c['choice_key']}"
+    onchange="autoSave('{q['question_key']}', this.value)" style="width:16px;height:16px;accent-color:#e53e3e">
+  <span>{c['choice_text']}</span>
+</label>"""
+        if not choices_html:
+            choices_html = f"""<textarea name="q_{q['question_key']}" rows="3"
+  onblur="autoSave('{q['question_key']}', this.value)"
+  placeholder="Your answer…"
+  style="width:100%;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem;resize:vertical"></textarea>"""
+        q_html += f"""<div class="card" style="padding:24px;margin-bottom:16px">
+  <div style="font-size:.78rem;font-weight:700;color:#9ca3af;margin-bottom:8px">QUESTION {i+1}</div>
+  <p style="font-weight:600;margin-bottom:16px">{q['question_text']}</p>
+  {choices_html}
+</div>"""
+
+    expires = state.get("expires_at", "")
+    body = f"""<div class="container" style="max-width:680px;padding-top:32px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+    <h1 style="font-size:1.4rem;font-weight:800;margin:0">Exam</h1>
+    <div id="timer" style="font-size:1rem;font-weight:700;color:#e53e3e;background:#fff1f2;padding:6px 16px;border-radius:20px">⏱ Loading…</div>
+  </div>
+  <form id="exam-form" method="POST" action="/student/exam/{attempt_id}/submit">
+    {q_html}
+    <div style="text-align:center;padding:24px 0">
+      <button type="submit" class="btn btn-red btn-lg" onclick="return confirm('Submit your exam? You cannot change answers after submitting.')">Submit Exam →</button>
+    </div>
+  </form>
+</div>
+<script>
+var expires = new Date("{expires}").getTime();
+function tick(){{
+  var now=Date.now(), diff=Math.max(0, Math.round((expires-now)/1000));
+  var m=Math.floor(diff/60), s=diff%60;
+  document.getElementById('timer').textContent='⏱ '+m+':'+(s<10?'0':'')+s;
+  if(diff<=0){{document.getElementById('exam-form').submit();return;}}
+  setTimeout(tick,1000);
+}}
+if(expires)tick();
+function autoSave(key, val){{
+  fetch('/student/exam/api/save',{{method:'POST',headers:{{'Content-Type':'application/x-www-form-urlencoded'}},
+    body:'attempt_id={attempt_id}&question_key='+encodeURIComponent(key)+'&answer='+encodeURIComponent(val)}});
+}}
+</script>"""
+    return HTMLResponse(_page("Exam", body))
 
 @app.post("/student/exam/api/save")
 async def save_exam_answer(request: Request, attempt_id: int = Form(...), question_key: str = Form(...), answer: str = Form(...)):
@@ -2283,18 +2339,19 @@ async def save_exam_answer(request: Request, attempt_id: int = Form(...), questi
 async def submit_exam(attempt_id: int, request: Request):
     student = _get_student(request)
     if not student: raise HTTPException(401, "Not logged in")
-    
+
+    att = one("SELECT submission_id, assessment_id FROM assessment_attempts WHERE id=?", (attempt_id,))
+    if not att:
+        raise HTTPException(404, "Exam attempt not found")
+
     try:
-        att = one("SELECT submission_id, assessment_id FROM assessment_attempts WHERE id=?", (attempt_id,))
         finalize_attempt(attempt_id)
-        
-        if att:
-            finalize_submission(att["submission_id"])
-            log_assessment_event("exam_submitted", att["submission_id"], att["assessment_id"], 1)
-            
-        return RedirectResponse("/student/dashboard", 302)
+        finalize_submission(att["submission_id"])
+        log_assessment_event("exam_submitted", att["submission_id"], att["assessment_id"], 1)
     except HTTPException as e:
         raise e
+
+    return RedirectResponse("/student", 302)
 
 # ─── Coach: Auth ──────────────────────────────────────────────────────────────
 
@@ -2442,7 +2499,7 @@ async def coach_dashboard(request: Request):
         rows_html += f"""<div class="card card-sm">
   <div class="flex items-center justify-between" style="margin-bottom:12px">
     <div><strong>{p['sname']}</strong><span class="text-muted text-sm" style="margin-left:8px">{p['semail']}</span>
-      <span class="badge badge-new" style="margin-left:8px">Day {p['day']}: {curr['title'] if curr else ''}</span></div>
+      <span class="badge badge-new" style="margin-left:8px">Day {p['day']}: {curr['title'] if curr else f"Day {p['assessment_id']}"}</span></div>
     <span class="text-xs text-muted">{str(p['submitted_at'])[:16]}</span>
   </div>
   <div style="background:#f9fafb;border-radius:8px;padding:14px;margin-bottom:12px">
