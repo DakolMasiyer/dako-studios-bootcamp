@@ -52,10 +52,19 @@ FLW_PUBLIC  = os.getenv("FLUTTERWAVE_PUBLIC_KEY") or os.getenv("FLW_CLIENT_ID", 
 FLW_SECRET_HASH = os.getenv("FLW_SECRET_HASH") or os.getenv("FLUTTERWAVE_WEBHOOK_SECRET", "")
 FLW_CLIENT_ID = os.getenv("FLW_CLIENT_ID") or FLW_PUBLIC
 FLW_CLIENT_SECRET = os.getenv("FLW_CLIENT_SECRET") or FLW_SECRET
-BOOTCAMP_CURRENCY = os.getenv("BOOTCAMP_CURRENCY", "USD")
-_default_price = "49" if BOOTCAMP_CURRENCY == "USD" else "75000"
-BOOTCAMP_PRICE = float(os.getenv("BOOTCAMP_PRICE", _default_price))
-PRICE_USD = BOOTCAMP_PRICE  # legacy alias used in UI templates
+PRICE_USD = float(os.getenv("BOOTCAMP_PRICE_USD", "49"))
+PRICE_NGN = float(os.getenv("BOOTCAMP_PRICE_NGN", "75000"))
+
+
+def _student_currency_price(student: dict) -> tuple[str, float]:
+    country = (student.get("country") or "").lower()
+    if "nigeria" in country:
+        return "NGN", PRICE_NGN
+    return "USD", PRICE_USD
+
+
+def _currency_symbol(currency: str) -> str:
+    return "₦" if currency == "NGN" else "$"
 BASE_URL    = os.getenv("BASE_URL", "http://localhost:8000")
 FREE_DAYS   = 3   # Days 1–FREE_DAYS are always free
 ALLOW_PAYMENT_DEV_BYPASS = os.getenv("ALLOW_PAYMENT_DEV_BYPASS", "false").lower() in ("1", "true", "yes")
@@ -1346,6 +1355,11 @@ async def ct_apply_post(
 async def pricing(request: Request):
     student = _get_student(request)
     cta = '<a href="/payment/checkout" class="btn btn-red btn-lg btn-full">Unlock All 20 Days</a>' if student and not student["paid_access"] else '<a href="/register" class="btn btn-red btn-lg btn-full">Start Free — Days 1–3</a>'
+    if student:
+        _pcurrency, _pprice = _student_currency_price(student)
+    else:
+        _pcurrency, _pprice = "USD", PRICE_USD
+    _psym = _currency_symbol(_pcurrency)
     body = f"""
 <div class="pricing-hero">
   <h1>The Complete Digital Skills Bootcamp</h1>
@@ -1360,8 +1374,8 @@ async def pricing(request: Request):
   <div class="pricing-card">
     <div style="text-align:center;margin-bottom:24px">
       <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:8px">Full Bootcamp Access</div>
-      <div class="paywall-price"><span class="paywall-currency">{"₦" if BOOTCAMP_CURRENCY == "NGN" else "$"}</span>{int(BOOTCAMP_PRICE):,}</div>
-      <div class="text-muted text-sm mt-2">One-time payment · Lifetime access · All payment methods</div>
+      <div class="paywall-price"><span class="paywall-currency">{_psym}</span>{int(_pprice):,}</div>
+      <div class="text-muted text-sm mt-2">One-time payment · Lifetime access · All payment methods{" · Nigerian students pay in ₦" if _pcurrency == "USD" and not student else ""}</div>
     </div>
     <ul class="feature-list">
       <li>Days 1–3 FREE — no card needed to start</li>
@@ -1401,6 +1415,9 @@ async def payment_checkout(request: Request):
     if student["paid_access"]:
         return RedirectResponse("/student", 302)
 
+    currency, price = _student_currency_price(student)
+    payment_options = "card,ussd,banktransfer" if currency == "NGN" else "card"
+
     if not FLW_SECRET:
         if _is_local_dev() and ALLOW_PAYMENT_DEV_BYPASS:
             tx_ref = f"bootcamp-{student['id']}-{uuid.uuid4().hex[:8]}"
@@ -1412,12 +1429,12 @@ async def payment_checkout(request: Request):
                     webhook_received_at, reconciliation_attempts, last_reconciliation_error, flw_ref
                 ) VALUES (?, ?, ?, ?, 'success', 'verified', ?, ?, 0, NULL, 'dev-bypass')
                 """,
-                (student["id"], BOOTCAMP_PRICE, BOOTCAMP_CURRENCY, tx_ref, now, now),
+                (student["id"], price, currency, tx_ref, now, now),
             )
             run("UPDATE students SET paid_access=1 WHERE id=?", (student["id"],))
-            log_payment_event("payment_initiated", tx_ref, student["id"], BOOTCAMP_PRICE)
-            log_payment_event("payment_verified", tx_ref, student["id"], BOOTCAMP_PRICE, flw_ref="dev-bypass", status="success")
-            log_payment_event("enrollment_activated", tx_ref, student["id"], BOOTCAMP_PRICE, flw_ref="dev-bypass")
+            log_payment_event("payment_initiated", tx_ref, student["id"], price)
+            log_payment_event("payment_verified", tx_ref, student["id"], price, flw_ref="dev-bypass", status="success")
+            log_payment_event("enrollment_activated", tx_ref, student["id"], price, flw_ref="dev-bypass")
             return RedirectResponse("/student?payment=success", 302)
 
         return HTMLResponse(_page("Payment",
@@ -1425,16 +1442,15 @@ async def payment_checkout(request: Request):
             'Set FLUTTERWAVE_SECRET_KEY or FLW_CLIENT_SECRET in your environment variables.</div></div>'))
 
     tx_ref = f"bootcamp-{student['id']}-{uuid.uuid4().hex[:8]}"
-    # Insert pending payment record
     run("INSERT OR IGNORE INTO payments (student_id, amount, currency, tx_ref, status) VALUES (?,?,?,?,?)",
-        (student["id"], BOOTCAMP_PRICE, BOOTCAMP_CURRENCY, tx_ref, "pending"))
+        (student["id"], price, currency, tx_ref, "pending"))
 
-    log_payment_event("payment_initiated", tx_ref, student["id"], BOOTCAMP_PRICE)
+    log_payment_event("payment_initiated", tx_ref, student["id"], price)
 
     payload = {
         "tx_ref": tx_ref,
-        "amount": BOOTCAMP_PRICE,
-        "currency": BOOTCAMP_CURRENCY,
+        "amount": price,
+        "currency": currency,
         "redirect_url": f"{BASE_URL}/payment/return",
         "customer": {
             "email": student["email"],
@@ -1445,7 +1461,7 @@ async def payment_checkout(request: Request):
             "description": f"Full 20-day Digital Skills Bootcamp (Days {FREE_DAYS+1}–20)",
             "logo": f"{BASE_URL}/static/logo.png",
         },
-        "payment_options": "card,mobilemoneyghana,mobilemoneyrwanda,mobilemoneyzambia,ussd,banktransfer",
+        "payment_options": payment_options,
     }
 
     try:
@@ -1927,12 +1943,14 @@ async def student_day(day_num: int, request: Request):
 
 
 def _paywall_page(student, day_num):
+    currency, price = _student_currency_price(student)
+    sym = _currency_symbol(currency)
     return f"""<div class="container" style="max-width:600px">
   <div class="card paywall-box">
     <div style="font-size:3rem;margin-bottom:16px">🔒</div>
     <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:8px">Day {day_num} is locked</h2>
     <p class="text-muted" style="margin-bottom:24px">Days {FREE_DAYS+1}–20 require full access. Unlock once and learn forever.</p>
-    <div class="paywall-price" style="margin-bottom:8px"><span class="paywall-currency">{"₦" if BOOTCAMP_CURRENCY == "NGN" else "$"}</span>{int(BOOTCAMP_PRICE):,}</div>
+    <div class="paywall-price" style="margin-bottom:8px"><span class="paywall-currency">{sym}</span>{int(price):,}</div>
     <div class="text-muted text-sm" style="margin-bottom:24px">One-time · Lifetime access · All payment methods</div>
     <ul class="feature-list" style="margin-bottom:24px">
       <li>{20 - FREE_DAYS} more days of lessons and missions</li>
@@ -1940,7 +1958,7 @@ def _paywall_page(student, day_num):
       <li>Pay by card, M-Pesa, MTN MoMo, bank transfer</li>
       <li>Digital certificate on completion</li>
     </ul>
-    <a href="/payment/checkout" class="btn btn-red btn-lg btn-full">Unlock Full Bootcamp — {"₦" if BOOTCAMP_CURRENCY == "NGN" else "$"}{int(BOOTCAMP_PRICE):,}</a>
+    <a href="/payment/checkout" class="btn btn-red btn-lg btn-full">Unlock Full Bootcamp — {sym}{int(price):,}</a>
     <div class="mt-3"><a href="/student" class="text-sm text-muted">← Back to dashboard</a></div>
   </div>
 </div>"""
