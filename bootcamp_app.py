@@ -144,16 +144,28 @@ def _get_lang(request: Request) -> str:
     lang = request.cookies.get("lang_pref", "en")
     return lang if lang in VALID_LANGS else "en"
 
+def _lang_name(code: str) -> str:
+    return get_t(code).get("lang_name", code.upper())
+
 def _lang_switcher(current_lang: str) -> str:
-    labels = {"en": "EN", "pcm": "PCM", "yo": "YO", "ha": "HA", "ig": "IG"}
-    btns = "".join(
-        f'<form method="POST" action="/set-language" style="display:inline;margin:0">'
+    options = "".join(
+        f'<form method="POST" action="/set-language">'
         f'<input type="hidden" name="lang" value="{code}">'
-        f'<button type="submit" class="lang-btn{"  lang-btn-active" if code == current_lang else ""}">{labels[code]}</button>'
+        f'<button type="submit" class="lang-option{" lang-active" if code == current_lang else ""}">'
+        f'<span class="lang-check">✓</span>{_lang_name(code)}'
+        f'</button>'
         f'</form>'
         for code in SUPPORTED_LANGS
     )
-    return f'<div class="lang-switcher">{btns}</div>'
+    chevron = ('<svg class="lang-chevron" viewBox="0 0 24 24" fill="none" '
+               'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" '
+               'stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>')
+    return (f'<details class="lang-dropdown">'
+            f'<summary class="lang-current">'
+            f'<span>{_lang_name(current_lang)}</span>{chevron}'
+            f'</summary>'
+            f'<div class="lang-menu">{options}</div>'
+            f'</details>')
 
 def _is_local_dev() -> bool:
     return BASE_URL.startswith("http://localhost") or BASE_URL.startswith("http://127.0.0.1")
@@ -407,11 +419,21 @@ LANDING_CSS = """
 .l-nav-link:hover{color:var(--white)}
 .l-nav-cta{background:var(--red);color:var(--white)!important;padding:0 20px!important;font-weight:700!important;border-bottom:none!important}
 .l-nav-cta:hover{background:var(--red2)!important}
-/* lang switcher */
-.lang-switcher{display:flex;gap:4px}
-.lang-btn{background:transparent;border:1px solid var(--g4);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 10px;border-radius:3px;cursor:pointer;transition:all .15s}
-.lang-btn:hover{border-color:var(--white);color:var(--white)}
-.lang-btn-active{border-color:var(--red);color:var(--red)}
+/* lang dropdown */
+.lang-dropdown{position:relative}
+.lang-dropdown summary{list-style:none;display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--g4);border-radius:6px;background:transparent;color:var(--light);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;letter-spacing:.3px;cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap}
+.lang-dropdown summary::-webkit-details-marker{display:none}
+.lang-dropdown summary:hover{border-color:var(--white);color:var(--white)}
+.lang-chevron{width:13px;height:13px;color:var(--muted);transition:transform .2s}
+.lang-dropdown[open] summary{border-color:var(--white);color:var(--white)}
+.lang-dropdown[open] .lang-chevron{transform:rotate(180deg);color:var(--white)}
+.lang-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:170px;background:var(--g2);border:1px solid var(--g3);border-radius:8px;padding:6px;box-shadow:0 14px 36px rgba(0,0,0,.55);z-index:600;display:flex;flex-direction:column;gap:2px}
+.lang-menu form{margin:0}
+.lang-option{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:none;color:var(--light);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;padding:9px 12px;border-radius:5px;cursor:pointer;transition:background .12s,color .12s}
+.lang-option:hover{background:var(--g3);color:var(--white)}
+.lang-check{width:14px;flex-shrink:0;font-size:11px;color:var(--red);opacity:0}
+.lang-option.lang-active{color:var(--white)}
+.lang-option.lang-active .lang-check{opacity:1}
 /* ── HERO ── */
 .l-hero{position:relative;min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;overflow:hidden;padding:80px 48px;margin-top:64px}
 .l-hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 100%,rgba(225,29,46,.08) 0%,transparent 70%),linear-gradient(180deg,var(--black) 0%,var(--g1) 100%)}
@@ -549,8 +571,14 @@ details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--red);color
 .l-footer p{font-size:12px;color:var(--muted)}
 .l-footer a{color:var(--red);text-decoration:none}
 /* ── RESPONSIVE ── */
+@media(max-width:1024px){
+  .l-nav{padding:0 32px}.l-container{padding:0 32px}
+  .l-why-grid,.l-tools-grid{grid-template-columns:repeat(2,1fr)}
+  .l-stages{grid-template-columns:repeat(4,1fr)}
+}
 @media(max-width:768px){
   .l-nav{padding:0 20px}.l-nav-right .l-nav-link:not(.l-nav-cta){display:none}
+  .l-nav-right{gap:8px}
   .l-hero{padding:60px 20px}.l-container{padding:0 20px}
   .l-course-grid{grid-template-columns:1fr}
   .l-why-grid{grid-template-columns:1fr 1fr}
@@ -562,8 +590,16 @@ details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--red);color
 }
 @media(max-width:480px){
   .l-why-grid,.l-tools-grid{grid-template-columns:1fr}
-  .l-stages{grid-template-columns:repeat(4,1fr)}
-  .lang-switcher{flex-wrap:wrap}
+  .l-stages{grid-template-columns:repeat(3,1fr)}
+  .l-nav{padding:0 14px}
+  .l-nav-brand{font-size:15px;letter-spacing:1px}
+  .l-nav-right{gap:6px}
+  .l-nav-cta{padding:0 12px!important}
+  .l-hero h1{font-size:clamp(38px,11vw,64px);letter-spacing:1px}
+  .l-hero-sub{font-size:16px}
+  .l-eyebrow-text{font-size:10px;letter-spacing:1.5px}
+  .lang-dropdown summary{padding:6px 9px;font-size:11px;gap:5px}
+  .lang-menu{min-width:150px}
 }
 """
 
@@ -621,6 +657,9 @@ function toggleProfileMenu(btn) {
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.nav-profile')) {
         document.querySelectorAll('.nav-dropdown.open').forEach(m => m.classList.remove('open'));
+    }
+    if (!e.target.closest('.lang-dropdown')) {
+        document.querySelectorAll('.lang-dropdown[open]').forEach(d => d.removeAttribute('open'));
     }
 });
 async function aiDraft(subId, btn) {
