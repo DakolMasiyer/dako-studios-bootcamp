@@ -3321,7 +3321,9 @@ async def receive_contact_message(payload: ContactRequest):
 
     # 2. Trigger real-time email notification (Option C integration)
     try:
-        from email_service import send_email, COACH_EMAIL, _html_wrap
+        from email_service import send_email, _html_wrap
+        import os
+        contact_email = os.getenv("CONTACT_EMAIL", "hello@dako.studio")
         subject = f"New Project Brief: {payload.name} ({payload.service.upper()})"
         html_body = _html_wrap(f"""
             <h2 style="font-size:1.25rem;font-weight:800;color:#CC0A0A;margin:0 0 16px">New Project Brief Submitted</h2>
@@ -3346,7 +3348,7 @@ async def receive_contact_message(payload: ContactRequest):
               </tr>
             </table>
         """)
-        send_email(COACH_EMAIL, subject, html_body)
+        send_email(contact_email, subject, html_body)
     except Exception as exc:
         import logging
         logging.warning("Failed to send contact notification email: %s", exc)
