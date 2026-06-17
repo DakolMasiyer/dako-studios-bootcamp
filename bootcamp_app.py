@@ -17,7 +17,7 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
+from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
 from translations import get_t, SUPPORTED_LANGS
 
@@ -453,14 +453,19 @@ LANDING_CSS = """
 .landing-page *{box-sizing:border-box}
 .landing-page::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.5}
 /* ── NAV ── */
-.l-nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:64px;background:rgba(8,8,8,.96);backdrop-filter:blur(16px);border-bottom:1px solid var(--g4)}
-.l-nav-brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.02em;color:var(--white);text-decoration:none}
-.l-nav-brand em{color:var(--red);font-style:normal}
-.l-nav-right{display:flex;align-items:center;gap:12px}
-.l-nav-link{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;padding:0 14px;height:64px;display:flex;align-items:center;transition:color .2s}
+.l-header{position:fixed;top:0;left:0;right:0;z-index:500;width:100%;transition:all .4s cubic-bezier(0.16,1,0.3,1);background:rgba(8,8,8,.8);backdrop-filter:blur(16px);border-bottom:1px solid rgba(44,44,48,.2);padding:0}
+.l-header.scrolled{background:transparent;backdrop-filter:none;border-bottom:1px solid transparent;padding-top:12px}
+.l-nav{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:1200px;margin:0 auto;padding:0 48px;height:64px;transition:all .4s cubic-bezier(0.16,1,0.3,1);border-radius:0;border:1px solid transparent;background:transparent}
+.l-header.scrolled .l-nav{width:calc(100% - 32px);max-width:900px;height:54px;padding:0 24px;background:rgba(14,14,14,.75);backdrop-filter:blur(20px);border:1px solid rgba(44,44,48,.6);border-radius:100px;box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.05) inset}
+.l-nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--white)}
+.l-brand-text{display:flex;flex-direction:column;justify-content:center;line-height:1}
+.l-brand-title{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.02em;color:var(--white)}
+.l-brand-sub{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;letter-spacing:0.15em;font-weight:700;color:var(--muted);margin-top:1px;text-transform:uppercase}
+.l-nav-right{display:flex;align-items:center;gap:12px;height:100%}
+.l-nav-link{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;padding:0 14px;height:100%;display:flex;align-items:center;transition:color .2s}
 .l-nav-link:hover{color:var(--white)}
-.l-nav-cta{background:var(--red);color:var(--white)!important;padding:0 20px!important;font-weight:700!important;border-bottom:none!important;border-radius:4px;transition:background 0.2s}
-.l-nav-cta:hover{background:var(--red2)!important}
+.l-nav-cta{background:var(--red);color:var(--white)!important;padding:0 20px!important;height:36px;display:inline-flex;align-items:center;font-weight:700!important;border-bottom:none!important;border-radius:100px;transition:all .3s cubic-bezier(0.16,1,0.3,1);box-shadow:0 4px 12px rgba(204,10,10,0.2)}
+.l-nav-cta:hover{background:var(--red2)!important;transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,10,10,0.3)}
 /* lang dropdown */
 .lang-dropdown{position:relative}
 .lang-dropdown summary{list-style:none;display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--g4);border-radius:4px;background:transparent;color:var(--light);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;letter-spacing:.3px;cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap}
@@ -621,6 +626,7 @@ details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--red);color
 @media(max-width:768px){
   .l-nav{padding:0 20px}.l-nav-right .l-nav-link:not(.l-nav-cta){display:none}
   .l-nav-right{gap:8px}
+  .l-header.scrolled .l-nav{width:calc(100% - 24px);padding:0 16px;height:52px}
   .l-hero{padding:60px 20px}.l-container{padding:0 20px}
   .l-course-grid{grid-template-columns:1fr}
   .l-why-grid{grid-template-columns:1fr 1fr}
@@ -634,9 +640,11 @@ details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--red);color
   .l-why-grid,.l-tools-grid{grid-template-columns:1fr}
   .l-stages{grid-template-columns:repeat(3,1fr)}
   .l-nav{padding:0 14px}
-  .l-nav-brand{font-size:15px;letter-spacing:1px}
+  .l-header.scrolled .l-nav{width:calc(100% - 16px);padding:0 12px;height:48px}
+  .l-brand-title{font-size:15px}
+  .l-brand-sub{font-size:8px}
   .l-nav-right{gap:6px}
-  .l-nav-cta{padding:0 12px!important}
+  .l-nav-cta{padding:0 12px!important;font-size:11px}
   .l-hero h1{font-size:clamp(38px,11vw,64px);letter-spacing:1px}
   .l-hero-sub{font-size:16px}
   .l-eyebrow-text{font-size:10px;letter-spacing:1.5px}
@@ -705,6 +713,19 @@ document.addEventListener('click', function(e) {
         document.querySelectorAll('.lang-dropdown[open]').forEach(d => d.removeAttribute('open'));
     }
 });
+function updateHeaderScroll() {
+    const header = document.querySelector('.l-header');
+    if (header) {
+        if (window.scrollY >= 50) {
+            header.classList.add('scrolled');
+        } else {
+            header.classList.remove('scrolled');
+        }
+    }
+}
+window.addEventListener('scroll', updateHeaderScroll);
+window.addEventListener('DOMContentLoaded', updateHeaderScroll);
+setTimeout(updateHeaderScroll, 50);
 async function aiDraft(subId, btn) {
     const ta = document.getElementById('fb-' + subId);
     const orig = btn.textContent;
@@ -735,6 +756,7 @@ def _page(title, body, nav="", extra_css="", lang="en"):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Dako Studios Bootcamp</title>
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -876,8 +898,17 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
 
     return f"""<div class="landing-page">
 <!-- NAV -->
+<header class="l-header">
 <nav class="l-nav">
-  <a href="/" class="l-nav-brand">DAKO<em>.</em>STUDIOS</a>
+  <a href="/" class="l-nav-brand">
+    <svg width="24" height="23" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;">
+      <path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/>
+    </svg>
+    <div class="l-brand-text">
+      <div class="l-brand-title">DAKO</div>
+      <div class="l-brand-sub">ACADEMY</div>
+    </div>
+  </a>
   <div class="l-nav-right">
     {switcher}
     <a href="#digital-skills" class="l-nav-link">{t["nav_digital"]}</a>
@@ -886,6 +917,7 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
     <a href="/onboarding" class="l-nav-link l-nav-cta">{t["ds_cta"]}</a>
   </div>
 </nav>
+</header>
 
 <!-- HERO -->
 <section class="l-hero">
@@ -1111,6 +1143,15 @@ function lStage(el,idx){{
   document.getElementById('lsd'+idx).classList.add('l-stage-active');
 }}
 </script>"""
+
+@app.get("/icon.svg")
+def get_icon():
+    svg_data = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 205 200" fill="none"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="#CC0A0A" /></svg>"""
+    return Response(content=svg_data, media_type="image/svg+xml")
+
+@app.get("/favicon.ico")
+def get_favicon():
+    return RedirectResponse(url="/icon.svg")
 
 # ─── Public: Auth ─────────────────────────────────────────────────────────────
 
