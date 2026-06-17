@@ -157,6 +157,17 @@ def _get_lang(request: Request) -> str:
 def _lang_name(code: str) -> str:
     return get_t(code).get("lang_name", code.upper())
 
+def _lang_switcher_flat(current_lang: str) -> str:
+    return "".join(
+        f'<form method="POST" action="/set-language">'
+        f'<input type="hidden" name="lang" value="{code}">'
+        f'<button type="submit" class="lang-option{" lang-active" if code == current_lang else ""}" style="width:100%;border-radius:6px">'
+        f'<span class="lang-check">✓</span>{_lang_name(code)}'
+        f'</button>'
+        f'</form>'
+        for code in SUPPORTED_LANGS
+    )
+
 def _lang_switcher(current_lang: str) -> str:
     options = "".join(
         f'<form method="POST" action="/set-language">'
@@ -533,6 +544,21 @@ html.dark {
 .theme-toggle:hover{background:var(--l-muted-bg);border-color:var(--white)}
 html.dark .theme-toggle .theme-icon-moon{display:none}
 html:not(.dark) .theme-toggle .theme-icon-sun{display:none}
+/* mobile nav controls */
+.l-nav-mobile{display:none;align-items:center;gap:8px;position:relative}
+.l-hamburger{background:transparent;border:1px solid var(--l-border);color:var(--white);width:34px;height:34px;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .2s;padding:0;outline:none;flex-shrink:0}
+.l-hamburger:hover{background:var(--l-muted-bg);border-color:var(--white)}
+/* mobile dropdown */
+.l-mobile-menu{display:none;position:absolute;top:calc(100% + 12px);right:0;min-width:220px;background:var(--l-card);border:1px solid var(--l-border);border-radius:16px;padding:6px;box-shadow:0 16px 48px rgba(0,0,0,.18);z-index:600;flex-direction:column;gap:2px}
+.l-mobile-menu.open{display:flex}
+.l-mobile-link{color:var(--white);font-size:15px;font-weight:500;text-decoration:none;padding:12px 16px;border-radius:10px;transition:background .15s;display:block}
+.l-mobile-link:hover{background:var(--l-muted-bg)}
+.l-mobile-sep{height:1px;background:var(--l-border);margin:4px 0}
+.l-mobile-lang-label{font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--l-muted);padding:8px 16px 4px}
+.l-mobile-lang-opts .lang-option{border-radius:8px;font-size:14px;width:100%}
+.l-mobile-cta-wrap{padding:4px 2px 2px}
+.l-mobile-cta{color:#FAF8F4!important;background:var(--l-red);border-radius:10px;padding:12px 16px!important;text-align:center;font-weight:700;text-decoration:none;display:block;transition:background .2s;font-size:14px;letter-spacing:.3px}
+.l-mobile-cta:hover{background:var(--l-red2)!important}
 /* lang dropdown */
 .lang-dropdown{position:relative}
 .lang-dropdown summary{list-style:none;display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--l-border);border-radius:4px;background:transparent;color:var(--light);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;letter-spacing:.3px;cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap}
@@ -701,8 +727,8 @@ details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--l-red);col
   .l-stages{grid-template-columns:repeat(4,1fr)}
 }
 @media(max-width:768px){
-  .l-nav{padding:0 20px}.l-nav-right .l-nav-link:not(.l-nav-cta){display:none}
-  .l-nav-right{gap:8px}
+  .l-nav{padding:0 20px}.l-nav-right{display:none}
+  .l-nav-mobile{display:flex}
   .l-header.scrolled .l-nav{width:calc(100% - 24px);padding:0 16px;height:52px}
   .l-hero{padding:60px 20px}.l-container{padding:0 20px}
   .l-course-grid{grid-template-columns:1fr}
@@ -724,8 +750,6 @@ details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--l-red);col
   .l-header.scrolled .l-nav{width:calc(100% - 16px);padding:0 12px;height:48px}
   .l-brand-title{font-size:15px}
   .l-brand-sub{font-size:8px}
-  .l-nav-right{gap:6px}
-  .l-nav-cta{padding:0 12px!important;font-size:11px}
   .l-hero h1{font-size:clamp(38px,11vw,64px);letter-spacing:1px}
   .l-hero-sub{font-size:16px}
   .l-eyebrow-text{font-size:10px;letter-spacing:1.5px}
@@ -786,12 +810,28 @@ function toggleProfileMenu(btn) {
     document.querySelectorAll('.nav-dropdown.open').forEach(m => m.classList.remove('open'));
     if (!isOpen) menu.classList.add('open');
 }
+function toggleMobileMenu() {
+    const menu = document.getElementById('lMobileMenu');
+    const btn = document.getElementById('lHamburger');
+    if (!menu) return;
+    const open = menu.classList.toggle('open');
+    btn && btn.setAttribute('aria-expanded', open);
+}
+function closeMobileMenu() {
+    const menu = document.getElementById('lMobileMenu');
+    const btn = document.getElementById('lHamburger');
+    if (menu) menu.classList.remove('open');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+}
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.nav-profile')) {
         document.querySelectorAll('.nav-dropdown.open').forEach(m => m.classList.remove('open'));
     }
     if (!e.target.closest('.lang-dropdown')) {
         document.querySelectorAll('.lang-dropdown[open]').forEach(d => d.removeAttribute('open'));
+    }
+    if (!e.target.closest('.l-nav-mobile')) {
+        closeMobileMenu();
     }
 });
 function toggleTheme() {
@@ -1000,6 +1040,7 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
         for i, (num, _, name, desc) in enumerate(_CT_STAGES)
     )
     switcher = _lang_switcher(lang)
+    lang_flat = _lang_switcher_flat(lang)
 
     return f"""<div class="landing-page">
 <!-- NAV -->
@@ -1014,6 +1055,7 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
       <div class="l-brand-sub">ACADEMY</div>
     </div>
   </a>
+  <!-- desktop nav -->
   <div class="l-nav-right">
     {switcher}
     <a href="#digital-skills" class="l-nav-link">{t["nav_digital"]}</a>
@@ -1024,6 +1066,29 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
       <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
     </button>
     <a href="/onboarding" class="l-nav-link l-nav-cta">{t["ds_cta"]}</a>
+  </div>
+  <!-- mobile controls: theme toggle + hamburger -->
+  <div class="l-nav-mobile">
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme">
+      <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+    <button class="l-hamburger" id="lHamburger" onclick="toggleMobileMenu()" aria-label="Menu" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2" y1="4.5" x2="14" y2="4.5"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="11.5" x2="14" y2="11.5"/></svg>
+    </button>
+    <!-- mobile dropdown menu -->
+    <div class="l-mobile-menu" id="lMobileMenu">
+      <a href="#digital-skills" class="l-mobile-link" onclick="closeMobileMenu()">{t["nav_digital"]}</a>
+      <a href="#creative-tech" class="l-mobile-link" onclick="closeMobileMenu()">{t["nav_creative"]}</a>
+      <a href="/login" class="l-mobile-link">{t["nav_login"]}</a>
+      <div class="l-mobile-sep"></div>
+      <div class="l-mobile-lang-label">Language</div>
+      <div class="l-mobile-lang-opts">{lang_flat}</div>
+      <div class="l-mobile-sep"></div>
+      <div class="l-mobile-cta-wrap">
+        <a href="/onboarding" class="l-mobile-cta">{t["ds_cta"]}</a>
+      </div>
+    </div>
   </div>
 </nav>
 </header>
