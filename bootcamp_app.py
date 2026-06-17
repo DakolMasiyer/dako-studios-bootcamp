@@ -315,35 +315,57 @@ async def _verify_flutterwave_transaction(
 # ─── CSS + JS ─────────────────────────────────────────────────────────────────
 
 CSS = """
+:root {
+  --background: #FAF8F4;
+  --foreground: #161618;
+  --card: #FFFFFF;
+  --card-border: #E0E0E4;
+  --muted: #8E8E92;
+  --muted-bg: #F0EEEC;
+  --red: #CC0A0A;
+  --red2: #931E22;
+  --red-dim: rgba(204,10,10,.08);
+  --white: #FFFFFF;
+  --nav-bg: rgba(250, 248, 244, 0.85);
+}
+html.dark {
+  --background: #080808;
+  --foreground: #FAF8F4;
+  --card: #161412;
+  --card-border: #2C2C30;
+  --muted-bg: #1E1E21;
+  --nav-bg: rgba(8, 8, 8, 0.9);
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:#080808;color:#FAF8F4;line-height:1.5;min-height:100vh;position:relative}
+body{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--background);color:var(--foreground);line-height:1.5;min-height:100vh;position:relative}
 body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.5}
 a{color:inherit;text-decoration:none}
-.nav{background:rgba(8,8,8,.9);backdrop-filter:blur(16px);color:#fff;padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;border-bottom:1px solid #2C2C30}
+.nav{background:var(--nav-bg);backdrop-filter:blur(16px);color:var(--foreground);padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--card-border)}
 .nav-brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.05rem;letter-spacing:-.02em}
 .nav-brand .r{color:#CC0A0A}
 .nav-right{display:flex;align-items:center;gap:20px;font-size:.85rem;font-weight:500}
-.nav-right a{color:rgba(250,248,244,.65);text-decoration:none;transition:color .15s}
-.nav-right a:hover{color:#fff}
-.nav-user{color:rgba(250,248,244,.85)}
-.nav-badge{background:#CC0A0A;color:#fff;padding:2px 8px;border-radius:4px;font-size:.65rem;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:0.05em}
+.nav-right a{color:var(--muted);text-decoration:none;transition:color .15s}
+.nav-right a:hover{color:var(--foreground)}
+.nav-user{color:var(--foreground)}
+.nav-badge{background:#CC0A0A;color:var(--foreground);padding:2px 8px;border-radius:4px;font-size:.65rem;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:0.05em}
 .container{max-width:1080px;margin:0 auto;padding:28px 20px;position:relative;z-index:10}
-.card{background:#161412;border-radius:4px;padding:28px;border:1px solid #2C2C30;box-shadow:0 4px 20px rgba(0,0,0,.5);margin-bottom:20px}
+.card{background:var(--card);border-radius:4px;padding:28px;border:1px solid var(--card-border);box-shadow:0 4px 20px rgba(0,0,0,.05);margin-bottom:20px}
+html.dark .card{box-shadow:0 4px 20px rgba(0,0,0,.55)}
 .card-sm{padding:18px 22px}
-.card-title{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:16px;color:#FAF8F4;letter-spacing:-0.01em}
+.card-title{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:16px;color:var(--foreground);letter-spacing:-0.01em}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 22px;border-radius:4px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;text-decoration:none;transition:all .2s ease-in-out;font-family:inherit;white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
 .btn:hover{opacity:.9;transform:translateY(-1px)}.btn:active{transform:scale(.98)}
-.btn-red{background:#CC0A0A;color:#fff;border:1px solid transparent}.btn-red:hover{background:#931E22;box-shadow:0 0 12px rgba(204,10,10,0.35)}
-.btn-dark{background:#161412;color:#fff;border:1px solid #2C2C30}.btn-dark:hover{background:#252220;border-color:#fff}
-.btn-green{background:#22c55e;color:#fff;border:1px solid transparent}.btn-green:hover{background:#16a34a;box-shadow:0 0 12px rgba(34,197,94,0.35)}
-.btn-orange{background:#f97316;color:#fff;border:1px solid transparent}.btn-orange:hover{background:#ea580c;box-shadow:0 0 12px rgba(249,115,22,0.35)}
-.btn-gold{background:#f59e0b;color:#fff;border:1px solid transparent}.btn-gold:hover{background:#d97706;box-shadow:0 0 12px rgba(245,158,11,0.35)}
-.btn-ghost{background:transparent;border:1px solid #2C2C30;color:#FAF8F4}.btn-ghost:hover{border-color:#FAF8F4;background:rgba(255,255,255,0.03)}
+.btn-red{background:#CC0A0A;color:var(--foreground);border:1px solid transparent}.btn-red:hover{background:#931E22;box-shadow:0 0 12px rgba(204,10,10,0.35)}
+.btn-dark{background:#161412;color:var(--foreground);border:1px solid #2C2C30}.btn-dark:hover{background:#252220;border-color:var(--foreground)}
+.btn-green{background:#22c55e;color:var(--foreground);border:1px solid transparent}.btn-green:hover{background:#16a34a;box-shadow:0 0 12px rgba(34,197,94,0.35)}
+.btn-orange{background:#f97316;color:var(--foreground);border:1px solid transparent}.btn-orange:hover{background:#ea580c;box-shadow:0 0 12px rgba(249,115,22,0.35)}
+.btn-gold{background:#f59e0b;color:var(--foreground);border:1px solid transparent}.btn-gold:hover{background:#d97706;box-shadow:0 0 12px rgba(245,158,11,0.35)}
+.btn-ghost{background:transparent;border:1px solid var(--card-border);color:#FAF8F4}.btn-ghost:hover{border-color:var(--foreground);background:rgba(255,255,255,0.03)}
 .btn-full{width:100%}
 .btn-lg{padding:14px 32px;font-size:.9rem;letter-spacing:1.5px}
 .form-group{margin-bottom:18px}
 .form-label{display:block;font-size:.75rem;font-weight:700;margin-bottom:6px;color:#8E8E92;text-transform:uppercase;letter-spacing:1px;font-family:'Space Grotesk',sans-serif}
-input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],textarea,select{width:100%;padding:10px 14px;border:1.5px solid #2C2C30;border-radius:4px;font-size:.9rem;font-family:inherit;background:#0E0E0E;color:#FAF8F4;transition:border-color .15s,box-shadow .15s}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],textarea,select{width:100%;padding:10px 14px;border:1.5px solid #2C2C30;border-radius:4px;font-size:.9rem;font-family:inherit;background:#0E0E0E;color:var(--foreground);transition:border-color .15s,box-shadow .15s}
 input:focus,textarea:focus,select:focus{outline:none;border-color:#CC0A0A;box-shadow:0 0 0 2px rgba(204,10,10,0.15)}
 textarea{resize:vertical;min-height:110px}
 .badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:4px;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'JetBrains Mono',monospace;border:1px solid transparent}
@@ -359,14 +381,14 @@ textarea{resize:vertical;min-height:110px}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .grid-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
 .grid-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px}
-.stat{background:#161412;border-radius:4px;padding:18px 20px;border:1px solid #2C2C30;box-shadow:0 4px 16px rgba(0,0,0,.3);transition:transform .2s ease-in-out}.stat:hover{transform:translateY(-2px)}
+.stat{background:var(--card);border-radius:4px;padding:18px 20px;border:1px solid var(--card-border);box-shadow:0 4px 16px rgba(0,0,0,.3);transition:transform .2s ease-in-out}.stat:hover{transform:translateY(-2px)}
 .stat-num{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:700;color:#CC0A0A;line-height:1.1}
 .stat-label{font-size:.65rem;color:#8E8E92;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:6px;font-family:'JetBrains Mono',monospace}
 .day-card{border-radius:4px;padding:14px 16px;border:2px solid transparent;transition:all .2s ease-in-out;display:block;text-decoration:none;color:inherit}
-.day-card.locked{background:#0e0e0e;border-color:#2C2C30;opacity:.45;pointer-events:none}
+.day-card.locked{background:#0e0e0e;border-color:var(--card-border);opacity:.45;pointer-events:none}
 .day-card.paywalled{background:rgba(251,191,36,0.02);border-color:rgba(251,191,36,0.15);cursor:pointer}
 .day-card.paywalled:hover{transform:translateY(-2px);border-color:#fbbf24;box-shadow:0 4px 16px rgba(251,191,36,.15)}
-.day-card.available{background:#161412;border-color:#2C2C30}
+.day-card.available{background:#161412;border-color:var(--card-border)}
 .day-card.available:hover{transform:translateY(-2px);border-color:#CC0A0A;box-shadow:0 4px 16px rgba(204,10,10,.15)}
 .day-card.pending{background:rgba(59,130,246,0.02);border-color:rgba(59,130,246,0.2)}
 .day-card.pending:hover{transform:translateY(-2px);border-color:#3b82f6;box-shadow:0 4px 16px rgba(59,130,246,.15)}
@@ -394,17 +416,17 @@ textarea{resize:vertical;min-height:110px}
 .sub-card.approved{border-color:#22c55e;background:#0f2c1b}
 .sub-card.needs_revision{border-color:#f97316;background:#23140a}
 .sub-card.pending{border-color:#3b82f6;background:#10223e}
-.student-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #2C2C30}
+.student-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--card-border)}
 .student-row:last-child{border-bottom:none}
 .table{width:100%;border-collapse:collapse;font-size:.875rem}
 .table th{text-align:left;padding:10px 12px;background:#0E0E0E;border-bottom:2px solid #2C2C30;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8E8E92;font-family:'JetBrains Mono',monospace}
-.table td{padding:10px 12px;border-bottom:1px solid #2C2C30}
+.table td{padding:10px 12px;border-bottom:1px solid var(--card-border)}
 .table tr:last-child td{border-bottom:none}
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#080808;position:relative}
 .login-wrap::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.5}
-.login-box{background:#161412;border:1px solid #2C2C30;border-radius:4px;padding:40px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;z-index:100}
+.login-box{background:var(--card);border:1px solid var(--card-border);border-radius:4px;padding:40px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;z-index:100}
 .login-logo{text-align:center;margin-bottom:28px}
-.login-logo .logo-text{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:800;color:#FAF8F4;letter-spacing:-0.02em}
+.login-logo .logo-text{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:800;color:var(--foreground);letter-spacing:-0.02em}
 .logo-text .r{color:#CC0A0A}
 .tagline{color:#8E8E92;font-size:.78rem;margin-top:6px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px}
 .tab-nav{display:flex;border-bottom:2px solid #2C2C30;margin-bottom:24px}
@@ -413,12 +435,12 @@ textarea{resize:vertical;min-height:110px}
 .tab-panel{display:none}.tab-panel.active{display:block}
 .lesson-content h3{font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;margin:20px 0 8px;color:#FAF8F4}
 .lesson-content h3:first-child{margin-top:0}
-.lesson-content p{margin-bottom:12px;line-height:1.75;color:#FAF8F4;opacity:0.9}
+.lesson-content p{margin-bottom:12px;line-height:1.75;color:var(--foreground);opacity:0.9}
 .lesson-content ul,.lesson-content ol{padding-left:20px;margin-bottom:12px}
-.lesson-content li{margin-bottom:6px;line-height:1.65;color:#FAF8F4;opacity:0.9}
+.lesson-content li{margin-bottom:6px;line-height:1.65;color:var(--foreground);opacity:0.9}
 .lesson-content dl{margin-bottom:12px}
-.lesson-content dt{font-weight:700;color:#FAF8F4;margin-top:10px}
-.lesson-content dd{color:#FAF8F4;opacity:0.9;padding-left:16px;margin-top:2px}
+.lesson-content dt{font-weight:700;color:var(--foreground);margin-top:10px}
+.lesson-content dd{color:var(--foreground);opacity:0.9;padding-left:16px;margin-top:2px}
 .lesson-content blockquote{border-left:4px solid #CC0A0A;padding:10px 16px;background:#1a1010;border-radius:0 4px 4px 0;margin:16px 0;font-style:italic}
 .video-wrap{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:4px;margin-bottom:20px}
 .video-wrap iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;border-radius:4px}
@@ -428,19 +450,19 @@ textarea{resize:vertical;min-height:110px}
 .feature-list{list-style:none;text-align:left;max-width:320px;margin:20px auto}
 .feature-list li{padding:8px 0;display:flex;align-items:center;gap:10px;font-size:.95rem}
 .feature-list li::before{content:"✓";color:#22c55e;font-weight:900;font-size:1.1rem}
-.pricing-hero{background:linear-gradient(135deg,#080808,#161412);color:#fff;padding:80px 40px;text-align:center;border-bottom:1px solid #2C2C30}
+.pricing-hero{background:linear-gradient(135deg,#080808,#161412);color:var(--foreground);padding:80px 40px;text-align:center;border-bottom:1px solid var(--card-border)}
 .pricing-hero h1{font-family:'Space Grotesk',sans-serif;font-size:2.5rem;font-weight:700;margin-bottom:16px}
 .pricing-hero p{font-size:1.1rem;color:rgba(250,248,244,.75);max-width:560px;margin:0 auto 32px}
-.pricing-card{max-width:420px;margin:-40px auto 0;background:#161412;border:1px solid #2C2C30;border-radius:4px;padding:36px;box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;z-index:10;color:#FAF8F4}
-.cohort-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #2C2C30}
+.pricing-card{max-width:420px;margin:-40px auto 0;background:var(--card);border:1px solid var(--card-border);border-radius:4px;padding:36px;box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;z-index:10;color:#FAF8F4}
+.cohort-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--card-border)}
 .cohort-row:last-child{border-bottom:none}
 @media(max-width:768px){.grid-2{grid-template-columns:1fr}.grid-stats{grid-template-columns:1fr 1fr}.grid-days{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}.pricing-hero{padding:48px 24px}.pricing-hero h1{font-size:1.75rem}}
 .nav-profile{position:relative}
-.nav-profile-btn{background:rgba(255,255,255,.08);border:none;color:#fff;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;flex-shrink:0}
+.nav-profile-btn{background:rgba(255,255,255,.08);border:none;color:var(--foreground);width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;flex-shrink:0}
 .nav-profile-btn:hover{background:rgba(255,255,255,.15)}
-.nav-dropdown{position:absolute;right:0;top:calc(100% + 8px);background:#161412;border:1px solid #2C2C30;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:188px;z-index:200;display:none;overflow:hidden}
+.nav-dropdown{position:absolute;right:0;top:calc(100% + 8px);background:var(--card);border:1px solid var(--card-border);border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:188px;z-index:200;display:none;overflow:hidden}
 .nav-dropdown.open{display:block}
-.nav-dropdown-header{padding:11px 16px;border-bottom:1px solid #2C2C30;font-size:.65rem;font-weight:700;color:#8E8E92;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'JetBrains Mono',monospace}
+.nav-dropdown-header{padding:11px 16px;border-bottom:1px solid var(--card-border);font-size:.65rem;font-weight:700;color:#8E8E92;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'JetBrains Mono',monospace}
 .nav-dropdown a{display:block;padding:10px 16px;color:#FAF8F4 !important;text-decoration:none;font-size:.875rem;transition:background .1s}
 .nav-dropdown a:hover{background:#2C2C30;color:#FAF8F4 !important}
 .nav-dropdown hr{border:none;border-top:1px solid #2C2C30;margin:4px 0}
@@ -466,6 +488,11 @@ LANDING_CSS = """
 .l-nav-link:hover{color:var(--white)}
 .l-nav-cta{background:var(--red);color:var(--white)!important;padding:0 20px!important;height:36px;display:inline-flex;align-items:center;font-weight:700!important;border-bottom:none!important;border-radius:100px;transition:all .3s cubic-bezier(0.16,1,0.3,1);box-shadow:0 4px 12px rgba(204,10,10,0.2)}
 .l-nav-cta:hover{background:var(--red2)!important;transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,10,10,0.3)}
+
+.theme-toggle{background:transparent;border:1px solid var(--card-border);color:var(--foreground);width:34px;height:34px;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .2s;padding:0;outline:none;flex-shrink:0}
+.theme-toggle:hover{background:var(--muted-bg);border-color:var(--foreground)}
+html.dark .theme-toggle .theme-icon-moon{display:none}
+html:not(.dark) .theme-toggle .theme-icon-sun{display:none}
 /* lang dropdown */
 .lang-dropdown{position:relative}
 .lang-dropdown summary{list-style:none;display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--g4);border-radius:4px;background:transparent;color:var(--light);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;letter-spacing:.3px;cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap}
@@ -654,34 +681,34 @@ details[open] .l-week-arr{transform:rotate(180deg);border-color:var(--red);color
 """
 
 ONBOARDING_CSS = """
-.ob-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:#080808;font-family:'Plus Jakarta Sans',sans-serif;position:relative}
+.ob-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--background);font-family:'Plus Jakarta Sans',sans-serif;position:relative}
 .ob-wrap::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.5}
-.ob-card{background:#161412;border:1px solid #2C2C30;border-radius:4px;padding:44px;width:100%;max-width:520px;position:relative;z-index:100}
+.ob-card{background:var(--card);border:1px solid var(--card-border);border-radius:4px;padding:44px;width:100%;max-width:520px;position:relative;z-index:100}
 .ob-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:#CC0A0A;border-radius:4px 4px 0 0}
-.ob-brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.02em;color:#fff;margin-bottom:32px;display:block;text-decoration:none}
+.ob-brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.02em;color:var(--foreground);margin-bottom:32px;display:block;text-decoration:none}
 .ob-brand em{color:#CC0A0A;font-style:normal}
 .ob-steps{display:flex;align-items:center;gap:6px;margin-bottom:36px}
 .ob-step-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #2C2C30;color:#8E8E92;transition:all .2s;font-family:'JetBrains Mono',monospace}
 .ob-step-dot.ob-active{border-color:#CC0A0A;color:#CC0A0A;background:rgba(204,10,10,.1)}
-.ob-step-dot.ob-done{border-color:#CC0A0A;background:#CC0A0A;color:#fff}
+.ob-step-dot.ob-done{border-color:#CC0A0A;background:#CC0A0A;color:var(--foreground)}
 .ob-step-line{flex:1;height:1px;background:#2C2C30}
-.ob-heading{font-family:'Space Grotesk',sans-serif;font-size:32px;letter-spacing:-0.02em;color:#fff;margin-bottom:8px}
+.ob-heading{font-family:'Space Grotesk',sans-serif;font-size:32px;letter-spacing:-0.02em;color:var(--foreground);margin-bottom:8px}
 .ob-sub{font-size:14px;color:#8E8E92;margin-bottom:28px}
 .ob-options{display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
-.ob-option{display:flex;align-items:center;gap:14px;padding:16px 18px;background:#0E0E0E;border:1px solid #2C2C30;border-radius:4px;cursor:pointer;font-size:14px;font-weight:500;color:#bbb;transition:all .15s;position:relative}
-.ob-option:hover{border-color:#555;color:#fff;background:#161412}
+.ob-option{display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--background);border:1px solid var(--card-border);border-radius:4px;cursor:pointer;font-size:14px;font-weight:500;color:#bbb;transition:all .15s;position:relative}
+.ob-option:hover{border-color:#555;color:var(--foreground);background:#161412}
 .ob-option input[type=radio]{position:absolute;opacity:0;width:0;height:0}
-.ob-option.ob-selected{border-color:#CC0A0A;color:#fff;background:rgba(204,10,10,.08)}
+.ob-option.ob-selected{border-color:#CC0A0A;color:var(--foreground);background:rgba(204,10,10,.08)}
 .ob-option-check{width:18px;height:18px;border-radius:50%;border:2px solid #2C2C30;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:transparent;transition:all .15s}
-.ob-option.ob-selected .ob-option-check{border-color:#CC0A0A;background:#CC0A0A;color:#fff}
-.ob-select{width:100%;background:#0E0E0E;border:1px solid #2C2C30;border-radius:4px;color:#bbb;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;padding:12px 16px;transition:border-color .15s;outline:none;margin-bottom:28px;cursor:pointer}
+.ob-option.ob-selected .ob-option-check{border-color:#CC0A0A;background:#CC0A0A;color:var(--foreground)}
+.ob-select{width:100%;background:var(--background);border:1px solid var(--card-border);border-radius:4px;color:#bbb;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;padding:12px 16px;transition:border-color .15s;outline:none;margin-bottom:28px;cursor:pointer}
 .ob-select:focus{border-color:#CC0A0A}
 .ob-select option{background:#161412}
 .ob-form-group{margin-bottom:18px}
 .ob-label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8E8E92;margin-bottom:8px;font-family:'Space Grotesk',sans-serif}
-.ob-input{width:100%;background:#0E0E0E;border:1px solid #2C2C30;border-radius:4px;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;padding:12px 16px;transition:border-color .15s;outline:none}
+.ob-input{width:100%;background:var(--background);border:1px solid var(--card-border);border-radius:4px;color:var(--foreground);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;padding:12px 16px;transition:border-color .15s;outline:none}
 .ob-input:focus{border-color:#CC0A0A}
-.ob-btn{width:100%;padding:14px;background:#CC0A0A;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:12px;letter-spacing:2px;text-transform:uppercase;border:none;border-radius:4px;cursor:pointer;transition:all .2s}
+.ob-btn{width:100%;padding:14px;background:#CC0A0A;color:var(--foreground);font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:12px;letter-spacing:2px;text-transform:uppercase;border:none;border-radius:4px;cursor:pointer;transition:all .2s}
 .ob-btn:hover{background:#931E22;transform:translateY(-1px)}
 .ob-back{background:none;border:none;color:#8E8E92;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;padding:0;font-family:'Plus Jakarta Sans',sans-serif;margin-top:14px;display:block}
 .ob-back:hover{color:#bbb}
@@ -713,6 +740,15 @@ document.addEventListener('click', function(e) {
         document.querySelectorAll('.lang-dropdown[open]').forEach(d => d.removeAttribute('open'));
     }
 });
+function toggleTheme() {
+    if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        localStorage.theme = 'light';
+    } else {
+        document.documentElement.classList.add('dark');
+        localStorage.theme = 'dark';
+    }
+}
 function updateHeaderScroll() {
     const header = document.querySelector('.l-header');
     if (header) {
@@ -757,6 +793,13 @@ def _page(title, body, nav="", extra_css="", lang="en"):
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Dako Studios Bootcamp</title>
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
+<script>
+  if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {{
+    document.documentElement.classList.add('dark');
+  }} else {{
+    document.documentElement.classList.remove('dark');
+  }}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -773,14 +816,18 @@ def _nav_student(student):
     pct = max(0, int((student["current_day"] - 1) / 20 * 100))
     free_badge = '' if student["paid_access"] else ' <span class="nav-badge">FREE</span>'
     return f"""<nav class="nav">
-  <a href="/student" class="brand-link" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;">
+  <a href="/student" class="brand-link" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
     <svg width="22" height="21" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
     <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;">
-      <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
       <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:7px;letter-spacing:0.15em;font-weight:700;color:#8E8E92;margin-top:1px;text-transform:uppercase;">ACADEMY</div>
     </div>
   </a>
   <div class="nav-right">
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme" style="margin: 0 10px;">
+      <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="progress-wrap" style="width:110px"><div class="progress-fill" style="width:{pct}%"></div></div>
       <span style="color:rgba(255,255,255,.55);font-size:.7rem;font-family:'JetBrains Mono',monospace;font-weight:700">DAY {student['current_day']}/20</span>
@@ -803,14 +850,18 @@ def _nav_coach(coach):
     pending = one("SELECT COUNT(*) as c FROM submissions WHERE submission_status='submitted' AND grading_status='pending'")["c"]
     badge = f'<span class="nav-badge">{pending}</span>' if pending else ""
     return f"""<nav class="nav">
-  <a href="/coach/dashboard" class="brand-link" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;">
+  <a href="/coach/dashboard" class="brand-link" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
     <svg width="22" height="21" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#fbbf24;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
     <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;">
-      <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
       <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:7px;letter-spacing:0.15em;font-weight:700;color:#fbbf24;margin-top:1px;text-transform:uppercase;">COACH</div>
     </div>
   </a>
   <div class="nav-right">
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme" style="margin: 0 10px;">
+      <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
     <a href="/coach/dashboard">Dashboard {badge}</a>
     <a href="/coach/students">Students</a>
     <a href="/coach/curriculum">Curriculum</a>
@@ -914,6 +965,10 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
     <a href="#digital-skills" class="l-nav-link">{t["nav_digital"]}</a>
     <a href="#creative-tech" class="l-nav-link">{t["nav_creative"]}</a>
     <a href="/login" class="l-nav-link">{t["nav_login"]}</a>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme" style="margin: 0 10px;">
+      <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
     <a href="/onboarding" class="l-nav-link l-nav-cta">{t["ds_cta"]}</a>
   </div>
 </nav>
@@ -1122,10 +1177,10 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
 <!-- FOOTER -->
 <footer class="l-footer">
   <div class="l-container"><div class="l-footer-inner">
-    <div class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;margin-bottom:10px;">
+    <div class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);margin-bottom:10px;">
       <svg width="24" height="23" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
       <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:16px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:16px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
         <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:8px;letter-spacing:0.15em;font-weight:700;color:#8E8E92;margin-top:1px;text-transform:uppercase;">ACADEMY</div>
       </div>
     </div>
@@ -1176,10 +1231,10 @@ def _login_page(error="", tab="login"):
     return f"""<div class="login-wrap">
   <div class="login-box">
     <div class="login-logo" style="display:flex;flex-direction:column;align-items:center;margin-bottom:28px;">
-      <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;margin-bottom:12px;">
+      <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);margin-bottom:12px;">
         <svg width="26" height="25" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
         <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
           <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;letter-spacing:0.15em;font-weight:700;color:#8E8E92;margin-top:1px;text-transform:uppercase;">ACADEMY</div>
         </div>
       </a>
@@ -1268,10 +1323,10 @@ def _ob_step1_page(t: dict, lang: str) -> str:
     switcher = _lang_switcher(lang)
     return f"""<div class="ob-wrap">
   <div class="ob-card">
-    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;margin-bottom:32px;">
+    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);margin-bottom:32px;">
       <svg width="22" height="21" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
       <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
         <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:7px;letter-spacing:0.15em;font-weight:700;color:#8E8E92;margin-top:1px;text-transform:uppercase;">ACADEMY</div>
       </div>
     </a>
@@ -1304,10 +1359,10 @@ def _ob_step2_page(t: dict, lang: str) -> str:
     opts_html = "".join(f'<option value="{c}">{c}</option>' for c in countries)
     return f"""<div class="ob-wrap">
   <div class="ob-card">
-    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;margin-bottom:32px;">
+    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);margin-bottom:32px;">
       <svg width="22" height="21" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
       <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
         <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:7px;letter-spacing:0.15em;font-weight:700;color:#8E8E92;margin-top:1px;text-transform:uppercase;">ACADEMY</div>
       </div>
     </a>
@@ -1330,10 +1385,10 @@ def _ob_step3_page(t: dict, lang: str, error: str = "") -> str:
     err_html = f'<div class="ob-alert">{error}</div>' if error else ""
     return f"""<div class="ob-wrap">
   <div class="ob-card">
-    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;margin-bottom:32px;">
+    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);margin-bottom:32px;">
       <svg width="22" height="21" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
       <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
         <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:7px;letter-spacing:0.15em;font-weight:700;color:#8E8E92;margin-top:1px;text-transform:uppercase;">ACADEMY</div>
       </div>
     </a>
@@ -1460,10 +1515,10 @@ def _ct_apply_page(t: dict, lang: str, success: bool = False, error: str = "") -
     )
     return f"""<div class="ob-wrap" style="align-items:flex-start;padding-top:80px">
   <div class="ob-card" style="max-width:600px">
-    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;margin-bottom:32px;">
+    <a href="/" class="brand-link" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);margin-bottom:32px;">
       <svg width="22" height="21" viewBox="0 0 205 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#CC0A0A;flex-shrink:0;"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="currentColor"/></svg>
       <div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:#fff;">DAKO</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:14px;letter-spacing:-0.02em;color:var(--foreground);">DAKO</div>
         <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:7px;letter-spacing:0.15em;font-weight:700;color:#8E8E92;margin-top:1px;text-transform:uppercase;">ACADEMY</div>
       </div>
     </a>
@@ -3191,7 +3246,7 @@ async def coach_ops_audit(request: Request):
                 <span class="text-xs text-muted">{l['created_at']}</span>
             </div>
             <div class="text-sm mb-2">Status: <span style="color:{status_color};font-weight:bold">{l['status']}</span> | Tx Ref: {l['tx_ref']}</div>
-            <pre style="background:#1C1C1E;color:#fff;padding:10px;border-radius:6px;font-size:.75rem;overflow-x:auto">{l['payload_json']}</pre>
+            <pre style="background:#1C1C1E;color:var(--foreground);padding:10px;border-radius:6px;font-size:.75rem;overflow-x:auto">{l['payload_json']}</pre>
         </div>'''
 
     body = f"""<div class="container">
