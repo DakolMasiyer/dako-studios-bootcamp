@@ -1081,6 +1081,7 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
       <a href="#digital-skills" class="l-mobile-link" onclick="closeMobileMenu()">{t["nav_digital"]}</a>
       <a href="#creative-tech" class="l-mobile-link" onclick="closeMobileMenu()">{t["nav_creative"]}</a>
       <a href="/login" class="l-mobile-link">{t["nav_login"]}</a>
+      <a href="https://dako.studio" target="_blank" rel="noopener noreferrer" class="l-mobile-link" style="color:var(--l-muted)">Studio Hub ↗</a>
       <div class="l-mobile-sep"></div>
       <div class="l-mobile-lang-label">Language</div>
       <div class="l-mobile-lang-opts">{lang_flat}</div>
@@ -1309,6 +1310,8 @@ def _landing_page(t: dict, lang: str, days: list) -> str:
       </div>
       <div class="l-footer-links-col">
         <div class="l-footer-links">
+          <a href="https://dako.studio" target="_blank" rel="noopener noreferrer" class="l-footer-link">Studio Hub</a>
+          <span class="l-footer-dot">·</span>
           <a href="https://dako.studio/labs" target="_blank" rel="noopener noreferrer" class="l-footer-link">Labs</a>
           <span class="l-footer-dot">·</span>
           <a href="https://dako.studio/#services" target="_blank" rel="noopener noreferrer" class="l-footer-link">Brand</a>
