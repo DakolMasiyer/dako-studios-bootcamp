@@ -886,6 +886,18 @@ def _page(title, body, nav="", extra_css="", lang="en"):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Dako Studios Bootcamp</title>
+<meta name="description" content="Learn the creative and technical skills to build products that convert. Dako Studios Bootcamp.">
+<meta property="og:title" content="{title} — Dako Studios Bootcamp">
+<meta property="og:description" content="Learn the creative and technical skills to build products that convert.">
+<meta property="og:image" content="/icon.svg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{title} — Dako Studios Bootcamp">
+<meta name="twitter:description" content="Learn the creative and technical skills to build products that convert.">
+<meta name="twitter:image" content="/icon.svg">
+<script type="application/ld+json">
+{{"@context": "https://schema.org", "@type": "Organization", "name": "Dako Studios Bootcamp", "url": "https://learn.dako.studio", "logo": "https://learn.dako.studio/icon.svg", "sameAs": []}}
+</script>
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <script>
   if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {{
@@ -1355,8 +1367,18 @@ def get_icon():
     svg_data = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 205 200" fill="none"><path d="M 0 0 L 108 0 Q 205 0 205 100 Q 205 200 108 200 L 0 200 L 0 132 L 70 100 L 0 68 Z" fill="#C1272D" /></svg>"""
     return Response(content=svg_data, media_type="image/svg+xml")
 
+@app.get("/robots.txt", response_class=Response)
+async def robots_txt():
+    content = "User-agent: *\nAllow: /\nSitemap: https://learn.dako.studio/sitemap.xml"
+    return Response(content=content, media_type="text/plain")
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap_xml():
+    content = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>https://learn.dako.studio/</loc>\n  </url>\n</urlset>'
+    return Response(content=content, media_type="application/xml")
+
 @app.get("/favicon.ico")
-def get_favicon():
+async def _favicon():
     return RedirectResponse(url="/icon.svg")
 
 # ─── Public: Auth ─────────────────────────────────────────────────────────────
